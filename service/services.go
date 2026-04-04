@@ -1,6 +1,7 @@
 	package service
 
 import (
+	"github.com/pupmme/sub/core"
 	"github.com/pupmme/sub/util/common"
 	"github.com/pupmme/sub/db"
 	"encoding/json"
@@ -93,7 +94,7 @@ func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage)
 			}
 		}
 
-		if corePtr.IsRunning() {
+		if core.GetCore().IsRunning() {
 			configData, err := json.Marshal(srv)
 			if err != nil {
 				return err
@@ -107,12 +108,12 @@ func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage)
 					}
 				}
 				if oldTag != "" {
-					if err := corePtr.RemoveService(oldTag); err != nil && err != nil && err.Error() != "not found" {
+					if err := core.GetCore().RemoveService(oldTag); err != nil && err != nil && err.Error() != "not found" {
 						return err
 					}
 				}
 			}
-			if err := corePtr.AddService(configData); err != nil {
+			if err := core.GetCore().AddService(configData); err != nil {
 				return err
 			}
 		}
@@ -154,8 +155,8 @@ func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage)
 		if err := json.Unmarshal(data, &tag); err != nil {
 			return err
 		}
-		if corePtr.IsRunning() {
-			if err := corePtr.RemoveService(tag); err != nil && err != nil && err.Error() != "not found" {
+		if core.GetCore().IsRunning() {
+			if err := core.GetCore().RemoveService(tag); err != nil && err != nil && err.Error() != "not found" {
 				return err
 			}
 		}
@@ -176,7 +177,7 @@ func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage)
 
 // RestartServices restarts specific services by IDs.
 func (s *ServicesService) RestartServices(tx interface{}, ids []uint) error {
-	if !corePtr.IsRunning() {
+	if !core.GetCore().IsRunning() {
 		return nil
 	}
 	cfg := db.Get()
@@ -185,7 +186,7 @@ func (s *ServicesService) RestartServices(tx interface{}, ids []uint) error {
 			if srv.Id != id {
 				continue
 			}
-			if err := corePtr.RemoveService(srv.Tag); err != nil && err != nil && err.Error() != "not found" {
+			if err := core.GetCore().RemoveService(srv.Tag); err != nil && err != nil && err.Error() != "not found" {
 				return err
 			}
 			srvModel := db.Service{
@@ -207,7 +208,7 @@ func (s *ServicesService) RestartServices(tx interface{}, ids []uint) error {
 			if err != nil {
 				return err
 			}
-			if err := corePtr.AddService(srvConfig); err != nil {
+			if err := core.GetCore().AddService(srvConfig); err != nil {
 				return err
 			}
 		}

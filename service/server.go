@@ -1,6 +1,7 @@
 	package service
 
 import (
+	"github.com/pupmme/sub/core"
 	"github.com/pupmme/sub/db"
 	"github.com/pupmme/sub/logger"
 	"encoding/base64"
@@ -135,10 +136,10 @@ func (s *ServerService) GetNetInfo() map[string]interface{} {
 func (s *ServerService) GetSingboxInfo() map[string]interface{} {
 	var rtm runtime.MemStats
 	runtime.ReadMemStats(&rtm)
-	isRunning := corePtr.IsRunning()
+	isRunning := core.GetCore().IsRunning()
 	uptime := uint32(0)
 	if isRunning {
-		uptime = corePtr.GetInstance().Uptime()
+		uptime = core.GetCore().GetInstance().Uptime()
 	}
 	return map[string]interface{}{
 		"running": isRunning,

@@ -1,6 +1,7 @@
 	package service
 
 import (
+	"github.com/pupmme/sub/core"
 	"github.com/pupmme/sub/util/common"
 	"github.com/pupmme/sub/db"
 	"encoding/json"
@@ -90,7 +91,7 @@ func (s *EndpointService) Save(tx interface{}, act string, data json.RawMessage)
 			}
 		}
 
-		if corePtr.IsRunning() {
+		if core.GetCore().IsRunning() {
 			configData, err := json.Marshal(endpoint)
 			if err != nil {
 				return err
@@ -104,12 +105,12 @@ func (s *EndpointService) Save(tx interface{}, act string, data json.RawMessage)
 					}
 				}
 				if oldTag != "" {
-					if err := corePtr.RemoveEndpoint(oldTag); err != nil && err != nil && err.Error() != "not found" {
+					if err := core.GetCore().RemoveEndpoint(oldTag); err != nil && err != nil && err.Error() != "not found" {
 						return err
 					}
 				}
 			}
-			if err := corePtr.AddEndpoint(configData); err != nil {
+			if err := core.GetCore().AddEndpoint(configData); err != nil {
 				return err
 			}
 		}
@@ -151,8 +152,8 @@ func (s *EndpointService) Save(tx interface{}, act string, data json.RawMessage)
 		if err := json.Unmarshal(data, &tag); err != nil {
 			return err
 		}
-		if corePtr.IsRunning() {
-			if err := corePtr.RemoveEndpoint(tag); err != nil && err != nil && err.Error() != "not found" {
+		if core.GetCore().IsRunning() {
+			if err := core.GetCore().RemoveEndpoint(tag); err != nil && err != nil && err.Error() != "not found" {
 				return err
 			}
 		}

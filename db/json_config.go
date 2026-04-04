@@ -1,6 +1,9 @@
 package db
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"time"
+)
 
 // Config is the root JSON configuration structure.
 // All data that was previously stored in SQLite is here.
@@ -142,4 +145,30 @@ type Tokens struct {
 	Token  string `json:"token"`
 	Expiry int64  `json:"expiry"`
 	UserId uint   `json:"userId"`
+}
+
+// GetTLS finds the TLS config for this inbound by ID.
+func (in *Inbound) GetTLS() *TLS {
+	if in.TlsId == 0 || in.Tls == nil {
+		return nil
+	}
+	return in.Tls
+}
+
+// ToSingbox returns TLS settings from the raw Server JSON.
+func (t *TLS) ToSingbox() map[string]interface{} {
+	if t.Server == nil {
+		return nil
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(t.Server, &m); err != nil {
+		return nil
+	}
+	return m
+}
+
+
+// Now returns current unix timestamp.
+func Now() int64 {
+	return time.Now().Unix()
 }

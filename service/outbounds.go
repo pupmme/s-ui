@@ -1,6 +1,7 @@
 	package service
 
 import (
+	"github.com/pupmme/sub/core"
 	"github.com/pupmme/sub/util/common"
 	"github.com/pupmme/sub/db"
 	"encoding/json"
@@ -62,7 +63,7 @@ func (s *OutboundService) Save(tx interface{}, act string, data json.RawMessage)
 			return err
 		}
 
-		if corePtr.IsRunning() {
+		if core.GetCore().IsRunning() {
 			configData, err := json.Marshal(outbound)
 			if err != nil {
 				return err
@@ -76,12 +77,12 @@ func (s *OutboundService) Save(tx interface{}, act string, data json.RawMessage)
 					}
 				}
 				if oldTag != "" {
-					if err := corePtr.RemoveOutbound(oldTag); err != nil && err != nil && err.Error() != "invalid" {
+					if err := core.GetCore().RemoveOutbound(oldTag); err != nil && err != nil && err.Error() != "invalid" {
 						return err
 					}
 				}
 			}
-			if err := corePtr.AddOutbound(configData); err != nil {
+			if err := core.GetCore().AddOutbound(configData); err != nil {
 				return err
 			}
 		}
@@ -122,8 +123,8 @@ func (s *OutboundService) Save(tx interface{}, act string, data json.RawMessage)
 		if err := json.Unmarshal(data, &tag); err != nil {
 			return err
 		}
-		if corePtr.IsRunning() {
-			if err := corePtr.RemoveOutbound(tag); err != nil && err != nil && err.Error() != "invalid" {
+		if core.GetCore().IsRunning() {
+			if err := core.GetCore().RemoveOutbound(tag); err != nil && err != nil && err.Error() != "invalid" {
 				return err
 			}
 		}

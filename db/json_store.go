@@ -135,3 +135,8 @@ func GetTLS() []TLS {
 	defer mu.RUnlock()
 	return cfg.TLS
 }
+
+// DataPath returns the default data file path.
+func DataPath() string {
+	return dbPath
+}

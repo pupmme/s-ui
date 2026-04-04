@@ -1,6 +1,7 @@
 	package service
 
 import (
+	"github.com/pupmme/sub/core"
 	"github.com/pupmme/sub/db"
 	"sort"
 	"time"
@@ -18,10 +19,10 @@ var onlineResources = &onlines{}
 type StatsService struct{}
 
 func (s *StatsService) SaveStats(enableTraffic bool) error {
-	if corePtr == nil || !corePtr.IsRunning() {
+	if core.GetCore() == nil || !core.GetCore().IsRunning() {
 		return nil
 	}
-	box := corePtr.GetInstance()
+	box := core.GetCore().GetInstance()
 	if box == nil {
 		return nil
 	}

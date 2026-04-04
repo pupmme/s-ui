@@ -1,6 +1,7 @@
 	package service
 
 import (
+	"github.com/pupmme/sub/core"
 	"github.com/pupmme/sub/util"
 	"github.com/pupmme/sub/util/common"
 	"github.com/pupmme/sub/db"
@@ -160,9 +161,9 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 			}
 		}
 
-		if corePtr.IsRunning() {
+		if core.GetCore().IsRunning() {
 			if act == "edit" && oldTag != "" {
-				if err := corePtr.RemoveInbound(oldTag); err != nil && err != nil && err.Error() != "invalid" {
+				if err := core.GetCore().RemoveInbound(oldTag); err != nil && err != nil && err.Error() != "invalid" {
 					return err
 				}
 			}
@@ -178,7 +179,7 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 			if err != nil {
 				return err
 			}
-			if err := corePtr.AddInbound(inboundConfig); err != nil {
+			if err := core.GetCore().AddInbound(inboundConfig); err != nil {
 				return err
 			}
 		}
@@ -240,8 +241,8 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 		if err := json.Unmarshal(data, &tag); err != nil {
 			return err
 		}
-		if corePtr.IsRunning() {
-			if err := corePtr.RemoveInbound(tag); err != nil && err != nil && err.Error() != "invalid" {
+		if core.GetCore().IsRunning() {
+			if err := core.GetCore().RemoveInbound(tag); err != nil && err != nil && err.Error() != "invalid" {
 				return err
 			}
 		}
@@ -471,7 +472,7 @@ func (s *InboundService) initUsersJSON(inboundJson []byte, clientIds string, inb
 }
 
 func (s *InboundService) RestartInbounds(tx interface{}, ids []uint) error {
-	if !corePtr.IsRunning() {
+	if !core.GetCore().IsRunning() {
 		return nil
 	}
 	for _, id := range ids {
@@ -479,10 +480,10 @@ func (s *InboundService) RestartInbounds(tx interface{}, ids []uint) error {
 			if inp.Id != id {
 				continue
 			}
-			if err := corePtr.RemoveInbound(inp.Tag); err != nil && err != nil && err.Error() != "invalid" {
+			if err := core.GetCore().RemoveInbound(inp.Tag); err != nil && err != nil && err.Error() != "invalid" {
 				return err
 			}
-			corePtr.GetInstance().ConnTracker().CloseConnByInbound(inp.Tag)
+			core.GetCore().GetInstance().ConnTracker().CloseConnByInbound(inp.Tag)
 
 			inbModel := &db.Inbound{
 				Id:      inp.Id,
@@ -501,7 +502,7 @@ func (s *InboundService) RestartInbounds(tx interface{}, ids []uint) error {
 			if err != nil {
 				return err
 			}
-			if err := corePtr.AddInbound(inboundConfig); err != nil {
+			if err := core.GetCore().AddInbound(inboundConfig); err != nil {
 				return err
 			}
 		}
