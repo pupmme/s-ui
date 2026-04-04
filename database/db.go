@@ -6,7 +6,6 @@ import (
 	"path"
 	"sync"
 
-	"github.com/pupmme/sub/config"
 	"github.com/pupmme/sub/db"
 	"github.com/pupmme/sub/logger"
 )
@@ -96,7 +95,7 @@ func IsNotFound(err error) bool {
 // Exported so callers that do direct saves can trigger it.
 func SaveConfig() error {
 	if cfgPath == "" {
-		cfgPath = config.GetDBPath()
+		cfgPath = "/etc/sub/singbox.json"
 	}
 	return db.Save(cfgPath)
 }

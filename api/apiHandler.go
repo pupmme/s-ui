@@ -1,9 +1,8 @@
 package api
 
 import (
+	"fmt"
 	"strings"
-
-	"github.com/pupmme/sub/util/common"
 
 	"github.com/gin-gonic/gin"
 )
@@ -30,12 +29,11 @@ func (a *APIHandler) initRouter(g *gin.RouterGroup) {
 
 func (a *APIHandler) postHandler(c *gin.Context) {
 	action := c.Param("postAction")
-
 	switch action {
 	case "login":
-		a.ApiService.Login(c)
-	case "changePass":
-		a.ApiService.ChangePass(c)
+		a.ApiService.Login(c.Request.FormValue("username"), c.Request.FormValue("password"), c.ClientIP())
+	case "logout":
+		a.ApiService.Logout(c)
 	case "save":
 		a.ApiService.Save(c)
 	case "restartApp":
@@ -43,43 +41,18 @@ func (a *APIHandler) postHandler(c *gin.Context) {
 	case "restartSb":
 		a.ApiService.RestartSb(c)
 	default:
-		jsonMsg(c, "failed", common.NewError("unknown action: ", action))
+		fmt.Println("unknown action: " + action)
 	}
 }
 
 func (a *APIHandler) getHandler(c *gin.Context) {
 	action := c.Param("getAction")
-
 	switch action {
-	case "logout":
-		a.ApiService.Logout(c)
-	case "load":
-		a.ApiService.LoadData(c)
-	case "inbounds", "outbounds", "endpoints", "services", "tls":
-		err := a.ApiService.LoadPartialData(c, []string{action})
-		if err != nil {
-			jsonMsg(c, action, err)
-		}
-		return
-	case "users":
-		a.ApiService.GetUsers(c)
-	case "settings":
-		a.ApiService.GetSettings(c)
-	case "stats":
-		a.ApiService.GetStats(c)
-	case "status":
-		a.ApiService.GetStatus(c)
-	case "onlines":
-		a.ApiService.GetOnlines(c)
-	case "logs":
-		a.ApiService.GetLogs(c)
-	case "keypairs":
-		a.ApiService.GetKeypairs(c)
-	case "singbox-config":
+	case "getConfig":
 		a.ApiService.GetSingboxConfig(c)
-	case "checkOutbound":
-		a.ApiService.GetCheckOutbound(c)
+	case "loadData":
+		a.ApiService.LoadData(c)
 	default:
-		jsonMsg(c, "failed", common.NewError("unknown action: ", action))
+		fmt.Println("unknown action: " + action)
 	}
 }

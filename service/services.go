@@ -1,12 +1,10 @@
-package service
+	package service
 
 import (
+	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/sub/db"
 	"encoding/json"
 
-	"github.com/pupmme/sub/database"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/util/common"
 )
 
 type ServicesService struct{}
@@ -50,7 +48,7 @@ func (s *ServicesService) GetAllConfig() ([]json.RawMessage, error) {
 		if srv.TlsId > 0 {
 			for _, tls := range cfg.TLS {
 				if tls.Id == srv.TlsId {
-					srvModel.Tls = &db.Tls{
+					srvModel.Tls = &db.TLS{
 						Id:     tls.Id,
 						Name:   tls.Name,
 						Server: tls.Server,
@@ -60,7 +58,7 @@ func (s *ServicesService) GetAllConfig() ([]json.RawMessage, error) {
 				}
 			}
 		}
-		srvJson, err := srvModel.MarshalJSON()
+		srvJson, err := json.Marshal(srvModel)
 		if err != nil {
 			return nil, err
 		}
@@ -76,7 +74,7 @@ func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage)
 	switch act {
 	case "new", "edit":
 		var srv db.Service
-		if err := srv.UnmarshalJSON(data); err != nil {
+		if err := json.Unmarshal(data, &srv); err != nil {
 			return err
 		}
 
@@ -84,7 +82,7 @@ func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage)
 			for i := range cfg.TLS {
 				if cfg.TLS[i].Id == srv.TlsId {
 					tls := cfg.TLS[i]
-					srv.Tls = &db.Tls{
+					srv.Tls = &db.TLS{
 						Id:     tls.Id,
 						Name:   tls.Name,
 						Server: tls.Server,
@@ -96,7 +94,7 @@ func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage)
 		}
 
 		if corePtr.IsRunning() {
-			configData, err := srv.MarshalJSON()
+			configData, err := json.Marshal(srv)
 			if err != nil {
 				return err
 			}
@@ -149,7 +147,7 @@ func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage)
 			cfg.Services = append(cfg.Services, srvJSON)
 		}
 		db.Set(cfg)
-		return database.SaveConfig()
+		return db.SaveConfig()
 
 	case "del":
 		var tag string
@@ -169,7 +167,7 @@ func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage)
 		}
 		cfg.Services = newServices
 		db.Set(cfg)
-		return database.SaveConfig()
+		return db.SaveConfig()
 
 	default:
 		return common.NewErrorf("unknown action: %s", act)
@@ -200,12 +198,12 @@ func (s *ServicesService) RestartServices(tx interface{}, ids []uint) error {
 			if srv.TlsId > 0 {
 				for _, tls := range cfg.TLS {
 					if tls.Id == srv.TlsId {
-						srvModel.Tls = &db.Tls{Id: tls.Id, Name: tls.Name, Server: tls.Server, Client: tls.Client}
+						srvModel.Tls = &db.TLS{Id: tls.Id, Name: tls.Name, Server: tls.Server, Client: tls.Client}
 						break
 					}
 				}
 			}
-			srvConfig, err := srvModel.MarshalJSON()
+			srvConfig, err := json.Marshal(srvModel)
 			if err != nil {
 				return err
 			}

@@ -1,120 +1,40 @@
 package app
 
 import (
-	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/pupmme/sub/config"
-	"github.com/pupmme/sub/core"
-	"github.com/pupmme/sub/cronjob"
-	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
 	"github.com/pupmme/sub/logger"
 	"github.com/pupmme/sub/service"
-	"github.com/pupmme/sub/sub"
 	"github.com/pupmme/sub/web"
-
-	"github.com/op/go-logging"
 )
 
-type APP struct {
-	service.SettingService
-	configService *service.ConfigService
-	webServer     *web.Server
-	cronJob       *cronjob.CronJob
-	logger        *logging.Logger
-	core          *core.Core
-}
+func Start() error {
+	logger.InitLogger()
+	logger.Info("sub starting...")
 
-func NewApp() *APP {
-	return &APP{}
-}
-
-func (a *APP) Init() error {
-	log.Printf("%v %v", config.GetName(), config.GetVersion())
-
-	a.initLog()
-
-	err := database.InitDB(config.GetDBPath())
-	if err != nil {
-		return err
+	if err := config.Load(); err != nil {
+		logger.Error("load config: ", err)
+	}
+	if err := db.Load("/etc/sub/singbox.json"); err != nil {
+		logger.Error("load db: ", err)
 	}
 
-	// Init Setting
-	a.SettingService.GetAllSetting()
+	coreSvc := service.NewCore()
+	if err := coreSvc.Start(); err != nil {
+		logger.Error("start core: ", err)
+	}
 
-	a.core = core.NewCore()
+	go web.NewServer()
 
-	a.cronJob = cronjob.NewCronJob()
-	a.webServer = web.NewServer()
-	a.configService = service.NewConfigService(a.core)
+	logger.Info("sub is running. PID: ", os.Getpid())
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
+	<-ch
 
+	logger.Info("shutting down...")
 	return nil
-}
-
-func (a *APP) Start() error {
-	loc, err := a.SettingService.GetTimeLocation()
-	if err != nil {
-		return err
-	}
-
-	trafficAge, err := a.SettingService.GetTrafficAge()
-	if err != nil {
-		return err
-	}
-
-	err = a.cronJob.Start(loc, trafficAge)
-	if err != nil {
-		return err
-	}
-
-	err = a.webServer.Start()
-	if err != nil {
-		return err
-	}
-
-	err = a.configService.StartCore()
-	if err != nil {
-		logger.Error(err)
-	}
-
-	return nil
-}
-
-func (a *APP) Stop() {
-	a.cronJob.Stop()
-	err := a.subServer.Stop()
-	if err != nil {
-		logger.Warning("stop Sub Server err:", err)
-	}
-	err = a.webServer.Stop()
-	if err != nil {
-		logger.Warning("stop Web Server err:", err)
-	}
-	err = a.configService.StopCore()
-	if err != nil {
-		logger.Warning("stop Core err:", err)
-	}
-}
-
-func (a *APP) initLog() {
-	switch config.GetLogLevel() {
-	case config.Debug:
-		logger.InitLogger(logging.DEBUG)
-	case config.Info:
-		logger.InitLogger(logging.INFO)
-	case config.Warn:
-		logger.InitLogger(logging.WARNING)
-	case config.Error:
-		logger.InitLogger(logging.ERROR)
-	default:
-		log.Fatal("unknown log level:", config.GetLogLevel())
-	}
-}
-
-func (a *APP) RestartApp() {
-	a.Stop()
-	a.Start()
-}
-
-func (a *APP) GetCore() *core.Core {
-	return a.core
 }

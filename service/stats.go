@@ -1,13 +1,10 @@
-package service
+	package service
 
 import (
-	"encoding/json"
+	"github.com/pupmme/sub/db"
 	"sort"
 	"time"
 
-	"github.com/pupmme/sub/database"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/db"
 )
 
 type onlines struct {
@@ -88,15 +85,15 @@ func (s *StatsService) SaveStats(enableTraffic bool) error {
 		db.Set(cfg)
 	}
 
-	return database.SaveConfig()
+	return db.SaveConfig()
 }
 
-func (s *StatsService) GetStats(resource string, tag string, limit int) ([]db.Stats, error) {
+func (s *StatsService) GetStats(resource string, tag string, limit int) ([]db.Stat, error) {
 	cfg := db.Get()
 	currentTime := time.Now().Unix()
 	timeDiff := currentTime - (int64(limit) * 3600)
 
-	var result []db.Stats
+	var result []db.Stat
 	resources := []string{resource}
 	if resource == "endpoint" {
 		resources = []string{"inbound", "outbound"}
@@ -105,7 +102,7 @@ func (s *StatsService) GetStats(resource string, tag string, limit int) ([]db.St
 		if stat.DateTime > timeDiff {
 			for _, r := range resources {
 				if stat.Resource == r && stat.Tag == tag {
-					result = append(result, db.Stats{
+					result = append(result, db.Stat{
 						DateTime:  stat.DateTime,
 						Resource:  stat.Resource,
 						Tag:       stat.Tag,
@@ -123,7 +120,7 @@ func (s *StatsService) GetStats(resource string, tag string, limit int) ([]db.St
 }
 
 // downsampleStats reduces stats to maxRows rows.
-func (s *StatsService) downsampleStats(stats []db.Stats, maxRows int) []db.Stats {
+func (s *StatsService) downsampleStats(stats []db.Stat, maxRows int) []db.Stat {
 	if len(stats) <= maxRows {
 		return stats
 	}
@@ -134,7 +131,7 @@ func (s *StatsService) downsampleStats(stats []db.Stats, maxRows int) []db.Stats
 	if bucketSpan == 0 {
 		bucketSpan = 1
 	}
-	downsampled := make([]db.Stats, 0, maxRows)
+	downsampled := make([]db.Stat, 0, maxRows)
 	for i := 0; i < numBuckets; i++ {
 		bucketStart := timeMin + int64(i)*bucketSpan
 		bucketEnd := timeMin + int64(i+1)*bucketSpan
@@ -154,7 +151,7 @@ func (s *StatsService) downsampleStats(stats []db.Stats, maxRows int) []db.Stats
 			if count > 0 {
 				avg = sum / int64(count)
 			}
-			downsampled = append(downsampled, db.Stats{
+			downsampled = append(downsampled, db.Stat{
 				DateTime:  bucketStart,
 				Resource:  stats[0].Resource,
 				Tag:       stats[0].Tag,
@@ -181,5 +178,5 @@ func (s *StatsService) DelOldStats(days int) error {
 	}
 	cfg.Stats = newStats
 	db.Set(cfg)
-	return database.SaveConfig()
+	return db.SaveConfig()
 }

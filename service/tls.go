@@ -1,12 +1,10 @@
-package service
+	package service
 
 import (
+	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/sub/db"
 	"encoding/json"
 
-	"github.com/pupmme/sub/database"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/util/common"
 )
 
 type TlsService struct {
@@ -14,11 +12,11 @@ type TlsService struct {
 	ServicesService
 }
 
-func (s *TlsService) GetAll() ([]db.Tls, error) {
+func (s *TlsService) GetAll() ([]db.TLS, error) {
 	cfg := db.Get()
-	result := make([]db.Tls, 0, len(cfg.TLS))
+	result := make([]db.TLS, 0, len(cfg.TLS))
 	for _, tls := range cfg.TLS {
-		result = append(result, db.Tls{
+		result = append(result, db.TLS{
 			Id:     tls.Id,
 			Name:   tls.Name,
 			Server: tls.Server,
@@ -34,7 +32,7 @@ func (s *TlsService) Save(tx interface{}, action string, data json.RawMessage, h
 
 	switch action {
 	case "new", "edit":
-		var tls db.Tls
+		var tls db.TLS
 		if err := json.Unmarshal(data, &tls); err != nil {
 			return err
 		}
@@ -101,7 +99,7 @@ func (s *TlsService) Save(tx interface{}, action string, data json.RawMessage, h
 			cfg.TLS = append(cfg.TLS, tlsJSON)
 		}
 		db.Set(cfg)
-		return database.SaveConfig()
+		return db.SaveConfig()
 
 	case "del":
 		var id uint
@@ -131,7 +129,7 @@ func (s *TlsService) Save(tx interface{}, action string, data json.RawMessage, h
 		}
 		cfg.TLS = newTLS
 		db.Set(cfg)
-		return database.SaveConfig()
+		return db.SaveConfig()
 
 	default:
 		return common.NewErrorf("unknown action: %s", action)

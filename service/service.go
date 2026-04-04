@@ -1,14 +1,13 @@
 package service
 
 import (
+	"encoding/json"
 	"sync"
 
 	"github.com/pupmme/sub/config"
 	"github.com/pupmme/sub/core"
-	"github.com/pupmme/sub/cronjob"
 	"github.com/pupmme/sub/db"
 	"github.com/pupmme/sub/logger"
-	"time"
 )
 
 var (
@@ -18,7 +17,7 @@ var (
 
 func GetCore() *core.Core {
 	coreOnce.Do(func() {
-		corePtr = core.New("/etc/sub/singbox.json")
+		corePtr = core.GetCore()
 	})
 	return corePtr
 }
@@ -36,20 +35,16 @@ func (c *Core) Start() error {
 	if err := db.Load("/etc/sub/singbox.json"); err != nil {
 		logger.Warning("load db: ", err)
 	}
-	loc, err := time.LoadLocation("Asia/Shanghai")
+	cfg := db.Get()
+	data, err := json.Marshal(cfg)
 	if err != nil {
-		loc = time.Local
+		return err
 	}
-	cronjob.NewCronJob().Start(loc, 30)
-	return GetCore().Start()
+	return GetCore().Start(data)
 }
 
 func (c *Core) Close() {
-	GetCore().Close()
-}
-
-func (c *Core) Ticker() {
-	GetCore().Ticker()
+	GetCore().Stop()
 }
 
 func (c *Core) GetInstance() *core.Core {

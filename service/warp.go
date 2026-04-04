@@ -1,6 +1,9 @@
-package service
+	package service
 
 import (
+	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/db"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
@@ -11,9 +14,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/logger"
-	"github.com/pupmme/sub/util/common"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )

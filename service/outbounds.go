@@ -1,13 +1,10 @@
-package service
+	package service
 
 import (
-	"encoding/json"
-	"os"
-
-	"github.com/pupmme/sub/database"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/db"
 	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/sub/db"
+	"encoding/json"
+
 )
 
 type OutboundService struct{}
@@ -45,7 +42,7 @@ func (o *OutboundService) GetAllConfig() ([]json.RawMessage, error) {
 			Tag:     outbound.Tag,
 			Options: outbound.Options,
 		}
-		outboundJson, err := outModel.MarshalJSON()
+		outboundJson, err := json.Marshal(outModel)
 		if err != nil {
 			return nil, err
 		}
@@ -61,12 +58,12 @@ func (s *OutboundService) Save(tx interface{}, act string, data json.RawMessage)
 	switch act {
 	case "new", "edit":
 		var outbound db.Outbound
-		if err := outbound.UnmarshalJSON(data); err != nil {
+		if err := json.Unmarshal(data, &outbound); err != nil {
 			return err
 		}
 
 		if corePtr.IsRunning() {
-			configData, err := outbound.MarshalJSON()
+			configData, err := json.Marshal(outbound)
 			if err != nil {
 				return err
 			}
@@ -118,7 +115,7 @@ func (s *OutboundService) Save(tx interface{}, act string, data json.RawMessage)
 			cfg.Outbounds = append(cfg.Outbounds, outJSON)
 		}
 		db.Set(cfg)
-		return database.SaveConfig()
+		return db.SaveConfig()
 
 	case "del":
 		var tag string
@@ -138,7 +135,7 @@ func (s *OutboundService) Save(tx interface{}, act string, data json.RawMessage)
 		}
 		cfg.Outbounds = newOutbounds
 		db.Set(cfg)
-		return database.SaveConfig()
+		return db.SaveConfig()
 
 	default:
 		return common.NewErrorf("unknown action: %s", act)

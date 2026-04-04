@@ -1,6 +1,9 @@
-package service
+	package service
 
 import (
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/sub/db"
 	"encoding/json"
 	"os"
 	"runtime"
@@ -8,10 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pupmme/sub/config"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/logger"
-	"github.com/pupmme/sub/util/common"
 )
 
 var defaultConfig = `{
@@ -55,8 +54,8 @@ func (s *SettingService) GetAllSetting() (*map[string]string, error) {
 	cfg := db.Get()
 	allSetting := make(map[string]string)
 
-	for _, setting := range cfg.Settings {
-		allSetting[setting.Key] = setting.Value
+	for key, value := range cfg.Settings {
+		allSetting[key] = value
 	}
 
 	for key, defaultValue := range defaultValueMap {
@@ -67,7 +66,7 @@ func (s *SettingService) GetAllSetting() (*map[string]string, error) {
 			}
 			cfg.Settings[key] = defaultValue
 			db.Set(cfg)
-			db.Save()
+			db.SaveConfig()
 			allSetting[key] = defaultValue
 		}
 	}
@@ -83,7 +82,7 @@ func (s *SettingService) ResetSettings() error {
 	cfg := db.Get()
 	cfg.Settings = make(map[string]string)
 	db.Set(cfg)
-	return db.Save()
+	return db.SaveConfig()
 }
 
 func (s *SettingService) getSetting(key string) (*settingRecord, error) {
@@ -118,7 +117,7 @@ func (s *SettingService) saveSetting(key string, value string) error {
 	}
 	cfg.Settings[key] = value
 	db.Set(cfg)
-	return db.Save()
+	return db.SaveConfig()
 }
 
 func (s *SettingService) setString(key string, value string) error {

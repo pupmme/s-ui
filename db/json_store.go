@@ -26,6 +26,13 @@ func Load(path string) error {
 	return json.Unmarshal(data, &cfg)
 }
 
+var dbPath = "/etc/sub/singbox.json"
+
+// SaveConfig persists the JSON config to disk (no args = use default path).
+func SaveConfig() error {
+	return Save(dbPath)
+}
+
 // Save writes the current Config to disk as indented JSON.
 func Save(path string) error {
 	mu.RLock()

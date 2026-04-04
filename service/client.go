@@ -1,16 +1,14 @@
-package service
+	package service
 
 import (
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/util"
+	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/sub/db"
 	"encoding/json"
 	"strings"
 	"time"
 
-	"github.com/pupmme/sub/database"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/logger"
-	"github.com/pupmme/sub/util"
-	"github.com/pupmme/sub/util/common"
 )
 
 type ClientService struct{}
@@ -139,7 +137,7 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 			cfg.Clients = append(cfg.Clients, s.modelToDbClient(client))
 		}
 		db.Set(cfg)
-		if err := database.SaveConfig(); err != nil {
+		if err := db.SaveConfig(); err != nil {
 			return nil, err
 		}
 
@@ -165,7 +163,7 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 			cfg.Clients = append(cfg.Clients, s.modelToDbClient(*client))
 		}
 		db.Set(cfg)
-		if err := database.SaveConfig(); err != nil {
+		if err := db.SaveConfig(); err != nil {
 			return nil, err
 		}
 
@@ -204,7 +202,7 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 			}
 		}
 		db.Set(cfg)
-		if err := database.SaveConfig(); err != nil {
+		if err := db.SaveConfig(); err != nil {
 			return nil, err
 		}
 
@@ -239,7 +237,7 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 		}
 		cfg.Clients = newClients
 		db.Set(cfg)
-		if err := database.SaveConfig(); err != nil {
+		if err := db.SaveConfig(); err != nil {
 			return nil, err
 		}
 
@@ -263,7 +261,7 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 		}
 		cfg.Clients = newClients
 		db.Set(cfg)
-		if err := database.SaveConfig(); err != nil {
+		if err := db.SaveConfig(); err != nil {
 			return nil, err
 		}
 
@@ -290,7 +288,7 @@ func (s *ClientService) updateLinksWithFixedInboundsJSON(clients []*db.Client, h
 	var inbounds []db.Inbound
 	for _, inb := range cfg.Inbounds {
 		for _, id := range inboundIds {
-			if inb.Id == id && slicesContains(util.InboundTypeWithLink, inb.Type) {
+			if inb.Id == id && util.SlicesContains(util.InboundTypeWithLink, inb.Type) {
 				inbounds = append(inbounds, db.Inbound{
 					Id:      inb.Id,
 					Type:    inb.Type,
@@ -399,7 +397,7 @@ func (s *ClientService) UpdateClientsOnInboundAddJSON(initIds string, inboundId 
 	}
 
 	db.Set(cfg)
-	return database.SaveConfig()
+	return db.SaveConfig()
 }
 
 // UpdateClientsOnInboundDeleteJSON updates clients when an inbound is deleted.
@@ -430,7 +428,7 @@ func (s *ClientService) UpdateClientsOnInboundDeleteJSON(id uint, tag string) er
 		c.Links, _ = json.MarshalIndent(newClientLinks, "", "  ")
 	}
 	db.Set(cfg)
-	return database.SaveConfig()
+	return db.SaveConfig()
 }
 
 // UpdateLinksByInboundChangeJSON regenerates links for changed inbounds.
@@ -479,7 +477,7 @@ func (s *ClientService) UpdateLinksByInboundChangeJSON(inbound db.Inbound, oldTa
 		c.Links, _ = json.MarshalIndent(newClientLinks, "", "  ")
 	}
 	db.Set(cfg)
-	return database.SaveConfig()
+	return db.SaveConfig()
 }
 
 func (s *ClientService) DepleteClients() ([]uint, error) {
@@ -522,7 +520,7 @@ func (s *ClientService) DepleteClients() ([]uint, error) {
 		cfg.Changes = append(cfg.Changes, changes...)
 		common.LastUpdate = dt
 		db.Set(cfg)
-		if err := database.SaveConfig(); err != nil {
+		if err := db.SaveConfig(); err != nil {
 			return nil, err
 		}
 	}
@@ -598,7 +596,7 @@ func (s *ClientService) ResetClientsJSON(dt int64) ([]uint, error) {
 		cfg.Changes = append(cfg.Changes, changes...)
 		common.LastUpdate = dt
 		db.Set(cfg)
-		if err := database.SaveConfig(); err != nil {
+		if err := db.SaveConfig(); err != nil {
 			return nil, err
 		}
 	}

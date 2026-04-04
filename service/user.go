@@ -1,14 +1,12 @@
-package service
+	package service
 
 import (
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/sub/db"
 	"encoding/json"
 	"os"
 
-	"github.com/pupmme/sub/database"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/logger"
-	"github.com/pupmme/sub/util/common"
 )
 
 type UserService struct{}
@@ -41,7 +39,7 @@ func (s *UserService) UpdateFirstUser(username string, password string) error {
 		cfg.Users[0].Password = password
 	}
 	db.Set(cfg)
-	return database.SaveConfig()
+	return db.SaveConfig()
 }
 
 func (s *UserService) Login(username string, password string, remoteIP string) (string, error) {
@@ -131,7 +129,7 @@ func (s *UserService) ChangePass(id string, oldPass string, newUser string, newP
 			u.Username = newUser
 			u.Password = newPass
 			db.Set(cfg)
-			return database.SaveConfig()
+			return db.SaveConfig()
 		}
 	}
 	return common.NewError("user not found or wrong password")

@@ -1,12 +1,10 @@
-package service
+	package service
 
 import (
+	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/sub/db"
 	"encoding/json"
 
-	"github.com/pupmme/sub/database"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/util/common"
 )
 
 type EndpointService struct {
@@ -48,7 +46,7 @@ func (o *EndpointService) GetAllConfig() ([]json.RawMessage, error) {
 			Options: endpoint.Options,
 			Ext:     endpoint.Ext,
 		}
-		endpointJson, err := epModel.MarshalJSON()
+		endpointJson, err := json.Marshal(epModel)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +62,7 @@ func (s *EndpointService) Save(tx interface{}, act string, data json.RawMessage)
 	switch act {
 	case "new", "edit":
 		var endpoint db.Endpoint
-		if err := endpoint.UnmarshalJSON(data); err != nil {
+		if err := json.Unmarshal(data, &endpoint); err != nil {
 			return err
 		}
 
@@ -93,7 +91,7 @@ func (s *EndpointService) Save(tx interface{}, act string, data json.RawMessage)
 		}
 
 		if corePtr.IsRunning() {
-			configData, err := endpoint.MarshalJSON()
+			configData, err := json.Marshal(endpoint)
 			if err != nil {
 				return err
 			}
@@ -146,7 +144,7 @@ func (s *EndpointService) Save(tx interface{}, act string, data json.RawMessage)
 			cfg.Endpoints = append(cfg.Endpoints, epJSON)
 		}
 		db.Set(cfg)
-		return database.SaveConfig()
+		return db.SaveConfig()
 
 	case "del":
 		var tag string
@@ -166,7 +164,7 @@ func (s *EndpointService) Save(tx interface{}, act string, data json.RawMessage)
 		}
 		cfg.Endpoints = newEndpoints
 		db.Set(cfg)
-		return database.SaveConfig()
+		return db.SaveConfig()
 
 	default:
 		return common.NewErrorf("unknown action: %s", act)

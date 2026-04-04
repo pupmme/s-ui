@@ -5,7 +5,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/pupmme/sub/logger"
 )
 
 var (
@@ -171,4 +170,12 @@ func GetWebPassword() string {
 		return "password"
 	}
 	return cfg.Web.Password
+}
+
+func GetVersion() string {
+	return "1.0.0"
+}
+
+func IsDebug() bool {
+	return false
 }

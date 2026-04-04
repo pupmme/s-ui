@@ -1,49 +1,16 @@
 package main
 
 import (
-	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/pupmme/sub/app"
 	"github.com/pupmme/sub/cmd"
 )
 
-func runApp() {
-	app := app.NewApp()
-
-	err := app.Init()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = app.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	sigCh := make(chan os.Signal, 1)
-	// Trap shutdown signals
-	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGTERM)
-	for {
-		sig := <-sigCh
-
-		switch sig {
-		case syscall.SIGHUP:
-			app.RestartApp()
-		default:
-			app.Stop()
-			return
-		}
-	}
-}
-
 func main() {
 	if len(os.Args) < 2 {
-		runApp()
+		app.Start()
 		return
-	} else {
-		cmd.ParseCmd()
 	}
+	cmd.Execute()
 }

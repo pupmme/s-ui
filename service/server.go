@@ -1,6 +1,8 @@
-package service
+	package service
 
 import (
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/logger"
 	"encoding/base64"
 	"os"
 	"runtime"
@@ -8,10 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pupmme/sub/config"
-	"github.com/pupmme/sub/database"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/logger"
 
 	"github.com/sagernet/sing-box/common/tls"
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -165,7 +163,7 @@ func (s *ServerService) GetSystemInfo() map[string]interface{} {
 	}
 	info["cpuCount"] = runtime.NumCPU()
 	info["hostName"], _ = os.Hostname()
-	info["appVersion"] = config.GetVersion()
+	info["appVersion"] = "v1.0.0"
 	ipv4 := make([]string, 0)
 	ipv6 := make([]string, 0)
 	// get ip address
@@ -255,22 +253,19 @@ func (s *ServerService) generateWireGuardKey(pk string) []string {
 }
 
 func (s *ServerService) GetDatabaseInfo() map[string]int64 {
-	info := make(map[string]int64, 0)
-	db := database.GetDB()
-	if db == nil {
+	info := make(map[string]int64)
+	cfg := db.Get()
+	if cfg == nil {
 		return nil
 	}
 
 	var clientsCount, inboundsCount, outboundsCount, servicesCount, endpointsCount, clientUp, clientDown int64
 
-	db.Model(&db.Client{}).Count(&clientsCount)
-	db.Model(&db.Inbound{}).Count(&inboundsCount)
-	db.Model(&db.Outbound{}).Count(&outboundsCount)
-	db.Model(&db.Service{}).Count(&servicesCount)
-	db.Model(&db.Endpoint{}).Count(&endpointsCount)
-	db.Model(&db.Client{}).Select("COALESCE(SUM(up+total_up),0)").Scan(&clientUp)
-	db.Model(&db.Client{}).Select("COALESCE(SUM(down+total_down),0)").Scan(&clientDown)
-
+	clientsCount = int64(len(db.GetClients()))
+	inboundsCount = int64(len(db.GetInbounds()))
+	outboundsCount = int64(len(db.GetOutbounds()))
+	servicesCount = int64(len(db.GetServices()))
+		
 	info["clients"] = clientsCount
 	info["inbounds"] = inboundsCount
 	info["outbounds"] = outboundsCount

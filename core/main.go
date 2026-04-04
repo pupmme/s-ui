@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"sync"
 
 	"github.com/pupmme/sub/logger"
 
@@ -23,6 +24,8 @@ var (
 	endpoint_manager adapter.EndpointManager
 	router           adapter.Router
 	factory          log.Factory
+	globalCore       *Core
+	globalCoreOnce   sync.Once
 )
 
 type Core struct {
@@ -30,7 +33,14 @@ type Core struct {
 	instance  *Box
 }
 
-func NewCore() *Core {
+func GetCore() *Core {
+	globalCoreOnce.Do(func() {
+		globalCore = New()
+	})
+	return globalCore
+}
+
+func New() *Core {
 	globalCtx = context.Background()
 	globalCtx = sb.Context(globalCtx, InboundRegistry(), OutboundRegistry(), EndpointRegistry(), DNSTransportRegistry(), ServiceRegistry())
 	return &Core{

@@ -1,12 +1,12 @@
 package service
 
 import (
+	"github.com/pupmme/sub/logger"
 	"os"
 	"runtime"
 	"syscall"
 	"time"
 
-	"github.com/pupmme/sub/logger"
 )
 
 type PanelService struct {

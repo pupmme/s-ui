@@ -83,24 +83,24 @@ func (c *StatsTracker) RoutedPacketConnection(ctx context.Context, conn network.
 	return bufio.NewInt64CounterPacketConn(conn, readCounter, nil, writeCounter, nil)
 }
 
-func (c *StatsTracker) GetStats() *[]db.Stats {
+func (c *StatsTracker) GetStats() *[]db.Stat {
 	c.access.Lock()
 	defer c.access.Unlock()
 
 	dt := time.Now().Unix()
 
-	s := []db.Stats{}
+	s := []db.Stat{}
 	for inbound, counter := range c.inbounds {
 		down := counter.write.Swap(0)
 		up := counter.read.Swap(0)
 		if down > 0 || up > 0 {
-			s = append(s, db.Stats{
+			s = append(s, db.Stat{
 				DateTime:  dt,
 				Resource:  "inbound",
 				Tag:       inbound,
 				Direction: false,
 				Traffic:   down,
-			}, db.Stats{
+			}, db.Stat{
 				DateTime:  dt,
 				Resource:  "inbound",
 				Tag:       inbound,
@@ -114,13 +114,13 @@ func (c *StatsTracker) GetStats() *[]db.Stats {
 		down := counter.write.Swap(0)
 		up := counter.read.Swap(0)
 		if down > 0 || up > 0 {
-			s = append(s, db.Stats{
+			s = append(s, db.Stat{
 				DateTime:  dt,
 				Resource:  "outbound",
 				Tag:       outbound,
 				Direction: false,
 				Traffic:   down,
-			}, db.Stats{
+			}, db.Stat{
 				DateTime:  dt,
 				Resource:  "outbound",
 				Tag:       outbound,
@@ -134,13 +134,13 @@ func (c *StatsTracker) GetStats() *[]db.Stats {
 		down := counter.write.Swap(0)
 		up := counter.read.Swap(0)
 		if down > 0 || up > 0 {
-			s = append(s, db.Stats{
+			s = append(s, db.Stat{
 				DateTime:  dt,
 				Resource:  "user",
 				Tag:       user,
 				Direction: false,
 				Traffic:   down,
-			}, db.Stats{
+			}, db.Stat{
 				DateTime:  dt,
 				Resource:  "user",
 				Tag:       user,

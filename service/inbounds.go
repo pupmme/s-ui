@@ -1,16 +1,12 @@
-package service
+	package service
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"strings"
-
-	"github.com/pupmme/sub/database"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/db"
 	"github.com/pupmme/sub/util"
 	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/sub/db"
+	"encoding/json"
+	"strings"
+
 )
 
 type InboundService struct {
@@ -135,7 +131,7 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 	switch act {
 	case "new", "edit":
 		var inbound db.Inbound
-		if err := inbound.UnmarshalJSON(data); err != nil {
+		if err := json.Unmarshal(data, &inbound); err != nil {
 			return err
 		}
 
@@ -143,7 +139,7 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 			for i := range cfg.TLS {
 				if cfg.TLS[i].Id == inbound.TlsId {
 					tls := cfg.TLS[i]
-					inbound.Tls = &db.Tls{
+					inbound.Tls = &db.TLS{
 						Id:     tls.Id,
 						Name:   tls.Name,
 						Server: tls.Server,
@@ -170,7 +166,7 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 					return err
 				}
 			}
-			inboundConfig, err := inbound.MarshalJSON()
+			inboundConfig, err := json.Marshal(inbound)
 			if err != nil {
 				return err
 			}
@@ -223,7 +219,7 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 			cfg.Inbounds = append(cfg.Inbounds, inbJSON)
 		}
 		db.Set(cfg)
-		if err := database.SaveConfig(); err != nil {
+		if err := db.SaveConfig(); err != nil {
 			return err
 		}
 
@@ -267,7 +263,7 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 		}
 		cfg.Inbounds = newInbounds
 		db.Set(cfg)
-		if err := database.SaveConfig(); err != nil {
+		if err := db.SaveConfig(); err != nil {
 			return err
 		}
 	default:
@@ -296,7 +292,7 @@ func (s *InboundService) UpdateOutJsons(tx interface{}, inboundIds []uint, hostn
 			if inb.TlsId > 0 {
 				for _, tls := range cfg.TLS {
 					if tls.Id == inb.TlsId {
-						inbModel.Tls = &db.Tls{
+						inbModel.Tls = &db.TLS{
 							Id:     tls.Id,
 							Name:   tls.Name,
 							Server: tls.Server,
@@ -313,7 +309,7 @@ func (s *InboundService) UpdateOutJsons(tx interface{}, inboundIds []uint, hostn
 		}
 	}
 	db.Set(cfg)
-	return database.SaveConfig()
+	return db.SaveConfig()
 }
 
 // GetAllConfig returns all inbounds as sing-box JSON configs.
@@ -333,7 +329,7 @@ func (s *InboundService) GetAllConfig() ([]json.RawMessage, error) {
 		if inp.TlsId > 0 {
 			for _, tls := range cfg.TLS {
 				if tls.Id == inp.TlsId {
-					inbModel.Tls = &db.Tls{
+					inbModel.Tls = &db.TLS{
 						Id:     tls.Id,
 						Name:   tls.Name,
 						Server: tls.Server,
@@ -343,7 +339,7 @@ func (s *InboundService) GetAllConfig() ([]json.RawMessage, error) {
 				}
 			}
 		}
-		inboundJson, err := inbModel.MarshalJSON()
+		inboundJson, err := json.Marshal(inbModel)
 		if err != nil {
 			return nil, err
 		}
@@ -497,7 +493,7 @@ func (s *InboundService) RestartInbounds(tx interface{}, ids []uint) error {
 				OutJson: inp.OutJson,
 				Options: inp.Options,
 			}
-			inboundConfig, err := inbModel.MarshalJSON()
+			inboundConfig, err := json.Marshal(inbModel)
 			if err != nil {
 				return err
 			}
