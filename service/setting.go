@@ -8,41 +8,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/config"
 	"github.com/pupmme/sub/db"
 	"github.com/pupmme/sub/logger"
 	"github.com/pupmme/sub/util/common"
 )
 
 var defaultConfig = `{
-  "log": {
-    "level": "info"
-  },
-  "dns": {
-    "servers": [],
-    "rules": []
-  },
-  "route": {
-    "rules": [
-      {
-        "action": "sniff"
-      },
-      {
-        "protocol": [
-          "dns"
-        ],
-        "action": "hijack-dns"
-      }
-    ]
-  },
+  "log": { "level": "info" },
+  "dns": { "servers": [], "rules": [] },
+  "route": { "rules": [{ "action": "sniff" }, { "protocol": ["dns"], "action": "hijack-dns" }] },
   "experimental": {}
 }`
 
 var defaultValueMap = map[string]string{
 	"webListen":     "",
 	"webDomain":     "",
-	"webPort":       "2095",
-	"secret":         common.Random(32),
+	"webPort":       "2053",
+	"secret":        common.Random(32),
 	"webCertFile":   "",
 	"webKeyFile":    "",
 	"webPath":       "/app/",
@@ -51,19 +34,19 @@ var defaultValueMap = map[string]string{
 	"trafficAge":    "30",
 	"timeLocation":  "Asia/Shanghai",
 	"subListen":     "",
-	"subPort":       "2096",
-	"subPath":       "/sub/",
+	"subPort":       "",
+	"subPath":       "",
 	"subDomain":     "",
 	"subCertFile":   "",
 	"subKeyFile":    "",
-	"subUpdates":    "12",
-	"subEncode":     "true",
+	"subUpdates":    "",
+	"subEncode":     "false",
 	"subShowInfo":   "false",
 	"subURI":        "",
 	"subJsonExt":    "",
 	"subClashExt":   "",
 	"config":        defaultConfig,
-	"version":       "pup-sub", // filled at runtime
+	"version":       "sub",
 }
 
 type SettingService struct{}
@@ -78,21 +61,17 @@ func (s *SettingService) GetAllSetting() (*map[string]string, error) {
 
 	for key, defaultValue := range defaultValueMap {
 		if _, exists := allSetting[key]; !exists {
-			// Save missing default value
 			cfg := db.Get()
 			if cfg.Settings == nil {
 				cfg.Settings = make(map[string]string)
 			}
 			cfg.Settings[key] = defaultValue
 			db.Set(cfg)
-			if err := database.SaveConfig(); err != nil {
-				logger.Warning("save default setting failed:", err)
-			}
+			db.Save()
 			allSetting[key] = defaultValue
 		}
 	}
 
-	// Security: redact sensitive keys
 	delete(allSetting, "secret")
 	delete(allSetting, "config")
 	delete(allSetting, "version")
@@ -104,7 +83,7 @@ func (s *SettingService) ResetSettings() error {
 	cfg := db.Get()
 	cfg.Settings = make(map[string]string)
 	db.Set(cfg)
-	return database.SaveConfig()
+	return db.Save()
 }
 
 func (s *SettingService) getSetting(key string) (*settingRecord, error) {
@@ -139,7 +118,7 @@ func (s *SettingService) saveSetting(key string, value string) error {
 	}
 	cfg.Settings[key] = value
 	db.Set(cfg)
-	return database.SaveConfig()
+	return db.Save()
 }
 
 func (s *SettingService) setString(key string, value string) error {
@@ -250,92 +229,22 @@ func (s *SettingService) GetTimeLocation() (*time.Location, error) {
 	return location, nil
 }
 
-func (s *SettingService) GetSubListen() (string, error) {
-	return s.getString("subListen")
-}
-
-func (s *SettingService) GetSubPort() (int, error) {
-	return s.getInt("subPort")
-}
-
-func (s *SettingService) SetSubPort(subPort int) error {
-	return s.setInt("subPort", subPort)
-}
-
-func (s *SettingService) GetSubPath() (string, error) {
-	subPath, err := s.getString("subPath")
-	if err != nil {
-		return "", err
-	}
-	if !strings.HasPrefix(subPath, "/") {
-		subPath = "/" + subPath
-	}
-	if !strings.HasSuffix(subPath, "/") {
-		subPath += "/"
-	}
-	return subPath, nil
-}
-
-func (s *SettingService) SetSubPath(subPath string) error {
-	if !strings.HasPrefix(subPath, "/") {
-		subPath = "/" + subPath
-	}
-	if !strings.HasSuffix(subPath, "/") {
-		subPath += "/"
-	}
-	return s.setString("subPath", subPath)
-}
-
-func (s *SettingService) GetSubDomain() (string, error) {
-	return s.getString("subDomain")
-}
-
-func (s *SettingService) GetSubCertFile() (string, error) {
-	return s.getString("subCertFile")
-}
-
-func (s *SettingService) GetSubKeyFile() (string, error) {
-	return s.getString("subKeyFile")
-}
-
-func (s *SettingService) GetSubUpdates() (int, error) {
-	return s.getInt("subUpdates")
-}
-
-func (s *SettingService) GetSubEncode() (bool, error) {
-	return s.getBool("subEncode")
-}
-
-func (s *SettingService) GetSubShowInfo() (bool, error) {
-	return s.getBool("subShowInfo")
-}
-
-func (s *SettingService) GetSubURI() (string, error) {
-	return s.getString("subURI")
-}
-
-func (s *SettingService) GetFinalSubURI(host string) (string, error) {
-	allSetting, err := s.GetAllSetting()
-	if err != nil {
-		return "", err
-	}
-	SubURI := (*allSetting)["subURI"]
-	if SubURI != "" {
-		return SubURI, nil
-	}
-	protocol := "http"
-	if (*allSetting)["subKeyFile"] != "" && (*allSetting)["subCertFile"] != "" {
-		protocol = "https"
-	}
-	if (*allSetting)["subDomain"] != "" {
-		host = (*allSetting)["subDomain"]
-	}
-	port := ":" + (*allSetting)["subPort"]
-	if (port == "80" && protocol == "http") || (port == "443" && protocol == "https") {
-		port = ""
-	}
-	return protocol + "://" + host + port + (*allSetting)["subPath"], nil
-}
+// Subscription methods — no longer needed, stubs for compatibility
+func (s *SettingService) GetSubListen() (string, error)           { return "", nil }
+func (s *SettingService) GetSubPort() (int, error)                  { return 0, nil }
+func (s *SettingService) SetSubPort(int) error                     { return nil }
+func (s *SettingService) GetSubPath() (string, error)               { return "", nil }
+func (s *SettingService) SetSubPath(string) error                   { return nil }
+func (s *SettingService) GetSubDomain() (string, error)            { return "", nil }
+func (s *SettingService) GetSubCertFile() (string, error)          { return "", nil }
+func (s *SettingService) GetSubKeyFile() (string, error)           { return "", nil }
+func (s *SettingService) GetSubUpdates() (int, error)              { return 0, nil }
+func (s *SettingService) GetSubEncode() (bool, error)              { return false, nil }
+func (s *SettingService) GetSubShowInfo() (bool, error)            { return false, nil }
+func (s *SettingService) GetSubURI() (string, error)                { return "", nil }
+func (s *SettingService) GetFinalSubURI(string) (string, error)    { return "", nil }
+func (s *SettingService) GetSubJsonExt() (string, error)           { return "", nil }
+func (s *SettingService) GetSubClashExt() (string, error)          { return "", nil }
 
 func (s *SettingService) GetConfig() (string, error) {
 	return s.getString("config")
@@ -345,7 +254,6 @@ func (s *SettingService) SetConfig(config string) error {
 	return s.setString("config", config)
 }
 
-// SaveConfig is kept for backward compatibility (tx parameter ignored).
 func (s *SettingService) SaveConfig(tx interface{}, config json.RawMessage) error {
 	configs, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
@@ -354,7 +262,6 @@ func (s *SettingService) SaveConfig(tx interface{}, config json.RawMessage) erro
 	return s.saveSetting("config", string(configs))
 }
 
-// Save persists all settings from the data map.
 func (s *SettingService) Save(tx interface{}, data json.RawMessage) error {
 	var settings map[string]string
 	err := json.Unmarshal(data, &settings)
@@ -384,12 +291,4 @@ func (s *SettingService) Save(tx interface{}, data json.RawMessage) error {
 		}
 	}
 	return nil
-}
-
-func (s *SettingService) GetSubJsonExt() (string, error) {
-	return s.getString("subJsonExt")
-}
-
-func (s *SettingService) GetSubClashExt() (string, error) {
-	return s.getString("subClashExt")
 }
