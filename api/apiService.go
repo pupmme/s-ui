@@ -6,6 +6,7 @@ import (
 
 	"github.com/pupmme/sub/logger"
 	"github.com/pupmme/sub/service"
+	"github.com/pupmme/sub/util/common"
 
 	"github.com/gin-gonic/gin"
 )
@@ -36,6 +37,28 @@ func (a *ApiService) getData(c *gin.Context) (map[string]interface{}, error) {
 	data := make(map[string]interface{})
 	data["status"] = "ok"
 	return data, nil
+}
+
+func (a *ApiService) Login(c *gin.Context) {
+	username := c.Request.FormValue("username")
+	password := c.Request.FormValue("password")
+	remoteIP := c.ClientIP()
+
+	if username == "" || password == "" {
+		jsonMsg(c, "login", common.NewError("username or password is empty"))
+		return
+	}
+
+	_, err := a.UserService.Login(username, password, remoteIP)
+	if err != nil {
+		logger.Warning("login failed: ", err, " IP: ", remoteIP)
+		jsonMsg(c, "login", common.NewError("wrong user or password!"))
+		return
+	}
+
+	// Save session so the user is considered logged in
+	SetLoginUser(c, username, 0)
+	c.JSON(200, gin.H{"status": "success"})
 }
 
 func (a *ApiService) Save(c *gin.Context) {

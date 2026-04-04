@@ -83,7 +83,31 @@ func checkLogin(c *gin.Context) {
 		if c.GetHeader("X-Requested-With") == "XMLHttpRequest" {
 			pureJsonMsg(c, false, "Invalid login")
 		} else {
-			c.Redirect(http.StatusTemporaryRedirect, "/login")
+			// Redirect to the login page within the current webPath
+			loginPath := c.Request.URL.Path + "login"
+			if !strings.HasSuffix(c.Request.URL.Path, "/") {
+				loginPath = c.Request.URL.Path + "/login"
+			}
+			c.Redirect(http.StatusTemporaryRedirect, loginPath)
+		}
+		c.Abort()
+	} else {
+		c.Next()
+	}
+}
+
+func checkLoginWithPrefix(c *gin.Context) {
+	if !IsLogin(c) {
+		if c.GetHeader("X-Requested-With") == "XMLHttpRequest" {
+			pureJsonMsg(c, false, "Invalid login")
+		} else {
+			// Redirect to login under the same base path
+			path := c.Request.URL.Path
+			if strings.HasSuffix(path, "/") {
+				c.Redirect(http.StatusTemporaryRedirect, path+"login")
+			} else {
+				c.Redirect(http.StatusTemporaryRedirect, path+"/login")
+			}
 		}
 		c.Abort()
 	} else {

@@ -17,21 +17,31 @@ func NewAPIHandler(g *gin.RouterGroup) {
 }
 
 func (a *APIHandler) initRouter(g *gin.RouterGroup) {
+	// checkLogin runs for all routes EXCEPT login and logout
 	g.Use(func(c *gin.Context) {
 		path := c.Request.URL.Path
+		// Only skip checkLogin for login and logout
 		if !strings.HasSuffix(path, "login") && !strings.HasSuffix(path, "logout") {
-			checkLogin(c)
+			checkLoginWithPrefix(c)
 		}
 	})
+
+	// Dedicated login handler (no auth required - already handled by middleware skip above)
+	g.POST("/login", a.loginHandler)
+	g.POST("/logout", a.ApiService.Logout)
+
+	// Generic handlers
 	g.POST("/:postAction", a.postHandler)
 	g.GET("/:getAction", a.getHandler)
+}
+
+func (a *APIHandler) loginHandler(c *gin.Context) {
+	a.ApiService.Login(c)
 }
 
 func (a *APIHandler) postHandler(c *gin.Context) {
 	action := c.Param("postAction")
 	switch action {
-	case "login":
-		a.ApiService.Login(c.Request.FormValue("username"), c.Request.FormValue("password"), c.ClientIP())
 	case "logout":
 		a.ApiService.Logout(c)
 	case "save":
