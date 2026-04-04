@@ -22,6 +22,7 @@ SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}.service"
 
 GIT_RAW="https://raw.githubusercontent.com/pupmme/s-ui"
 REPO_API="https://api.github.com/repos/pupmme/s-ui/releases"
+REPO_DOWNLOAD="https://github.com/pupmme/s-ui/releases/download"
 
 error()   { echo -e "${red}[错误]${plain} $*"; }
 info()    { echo -e "${blue}[信息]${plain} $*"; }
@@ -37,34 +38,32 @@ fi
 arch_detect() {
     case "$(uname -m)" in
     x86_64|x64|amd64)   echo 'amd64' ;;
-    aarch64|arm64)      echo 'arm64' ;;
-    armv7l)             echo 'armv7' ;;
-    *)                  echo 'amd64' ;;
+    aarch64|arm64)       echo 'arm64' ;;
+    armv7l)              echo 'armv7' ;;
+    *)                   echo 'amd64' ;;
     esac
 }
 
 systemd_reload() {
-    if systemctl is-active --quiet ${SERVICE_NAME}; then
-        systemctl stop ${SERVICE_NAME} 2>/dev/null || true
-    fi
-    if systemctl is-enabled --quiet ${SERVICE_NAME} 2>/dev/null; then
-        systemctl disable ${SERVICE_NAME} 2>/dev/null || true
-    fi
+    systemctl stop ${SERVICE_NAME} 2>/dev/null || true
+    systemctl disable ${SERVICE_NAME} 2>/dev/null || true
+    rm -f /etc/systemd/system/${SERVICE_NAME}.service
     systemctl daemon-reload
 }
 
 uninstall_old() {
-    # 清理旧版 pupmsub / sub 安装
     if [[ -f /etc/systemd/system/sub.service ]] || [[ -f /etc/systemd/system/sing-box.service ]]; then
-        warn "检测到旧版安装，正在清理..."
-        systemd_reload 2>/dev/null || true
+        warn "检测到旧版 pupmsub，正在清理..."
+        systemctl stop sub 2>/dev/null || true
+        systemctl stop sing-box 2>/dev/null || true
+        systemctl disable sub 2>/dev/null || true
+        systemctl disable sing-box 2>/dev/null || true
         rm -f /etc/systemd/system/sub.service
         rm -f /etc/systemd/system/sing-box.service
         rm -rf /usr/local/sub/
         rm -f /usr/bin/sub
-        info "旧版清理完成"
+        info "旧版 pupmsub 清理完成"
     fi
-    # 清理本工具旧安装
     if [[ -d "${BIN_DIR}" ]] || [[ -f "${CMD_PATH}" ]]; then
         warn "检测到本工具旧版安装，正在卸载..."
         systemd_reload
@@ -100,7 +99,6 @@ Restart=on-failure
 RestartSec=5s
 StateDirectory=sub
 StateDirectoryMode=0755
-PermissionsStartOnly=true
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 
 [Install]
@@ -112,6 +110,7 @@ EOF
 write_default_config() {
     mkdir -p "${CFG_DIR}"
     if [[ ! -f "${CFG_DIR}/config.json" ]]; then
+        local rand_pw=$(head -c 12 /dev/urandom | base64)
         cat > "${CFG_DIR}/config.json" << EOF
 {
   "log": {
@@ -123,7 +122,7 @@ write_default_config() {
     "cert": "",
     "key": "",
     "username": "admin",
-    "password": "$(head -c 12 /dev/urandom | base64)"
+    "password": "${rand_pw}"
   },
   "node": false,
   "xboard": {
@@ -153,6 +152,8 @@ write_default_config() {
 }
 EOF
         success "配置文件已写入 (${CFG_DIR}/config.json)"
+    else
+        success "使用现有配置文件 (${CFG_DIR}/config.json)"
     fi
 }
 
@@ -163,6 +164,7 @@ fetch_binary() {
 
     info "下载 s-ui ${arch} ..."
 
+    # 获取版本
     if [[ $# -eq 0 ]]; then
         local latest=$(curl -sL "${REPO_API}/latest" | grep -oP '"tag_name":\s*"\K[^"]+')
         if [[ -z "${latest}" ]]; then
@@ -173,17 +175,35 @@ fetch_binary() {
     else
         local latest=$1
     fi
-
     info "版本: ${latest}"
 
-    local url="${REPO_API}/download/${latest}/s-ui-linux-${arch}.tar.gz"
-    wget -q -O "${tmp_tar}" "${url}"
-    if [[ $? -ne 0 ]]; then
-        error "下载失败: ${url}"
+    # 多镜像下载
+    local base_url="${REPO_DOWNLOAD}/${latest}/s-ui-linux-${arch}.tar.gz"
+    local mirrors=(
+        "https://gh-proxy.com${base_url}"
+        "https://ghfast.top${base_url}"
+        "${base_url}"
+    )
+
+    local downloaded=false
+    for url in "${mirrors[@]}"; do
+        info "尝试下载: ${url}"
+        if wget -q -O "${tmp_tar}" "${url}" --timeout=120; then
+            downloaded=true
+            break
+        else
+            warn "下载失败，尝试下一个镜像..."
+        fi
+    done
+
+    if ! $downloaded; then
+        error "所有镜像下载均失败，请检查网络"
         rm -rf "${tmp_dir}"
         exit 1
     fi
+    success "下载完成"
 
+    # 解压
     tar -xzf "${tmp_tar}" -C "${tmp_dir}"
     local extracted_dir=$(ls "${tmp_dir}" | grep -v 'tar.gz' | head -1)
     if [[ -z "${extracted_dir}" ]]; then
@@ -199,9 +219,7 @@ fetch_binary() {
     chmod +x "${BIN_DIR}/s-ui.sh"
     ln -sf "${BIN_DIR}/s-ui.sh" "${CMD_PATH}"
 
-    # 清理
     rm -rf "${tmp_dir}"
-
     success "二进制安装完成 (${BIN_PATH})"
 }
 
