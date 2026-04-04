@@ -6,9 +6,9 @@ import (
 	"path"
 	"sync"
 
-	"github.com/alireza0/s-ui/config"
-	"github.com/alireza0/s-ui/db"
-	"github.com/alireza0/s-ui/logger"
+	"github.com/pupmme/sub/config"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/logger"
 )
 
 // cfgPath is the path to the JSON config file.

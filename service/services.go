@@ -3,10 +3,10 @@ package service
 import (
 	"encoding/json"
 
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/db"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/util/common"
 )
 
 type ServicesService struct{}
@@ -40,7 +40,7 @@ func (s *ServicesService) GetAllConfig() ([]json.RawMessage, error) {
 	cfg := db.Get()
 	var servicesJson []json.RawMessage
 	for _, srv := range cfg.Services {
-		srvModel := model.Service{
+		srvModel := db.Service{
 			Id:      srv.Id,
 			Type:    srv.Type,
 			Tag:     srv.Tag,
@@ -50,7 +50,7 @@ func (s *ServicesService) GetAllConfig() ([]json.RawMessage, error) {
 		if srv.TlsId > 0 {
 			for _, tls := range cfg.TLS {
 				if tls.Id == srv.TlsId {
-					srvModel.Tls = &model.Tls{
+					srvModel.Tls = &db.Tls{
 						Id:     tls.Id,
 						Name:   tls.Name,
 						Server: tls.Server,
@@ -75,7 +75,7 @@ func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage)
 
 	switch act {
 	case "new", "edit":
-		var srv model.Service
+		var srv db.Service
 		if err := srv.UnmarshalJSON(data); err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage)
 			for i := range cfg.TLS {
 				if cfg.TLS[i].Id == srv.TlsId {
 					tls := cfg.TLS[i]
-					srv.Tls = &model.Tls{
+					srv.Tls = &db.Tls{
 						Id:     tls.Id,
 						Name:   tls.Name,
 						Server: tls.Server,
@@ -190,7 +190,7 @@ func (s *ServicesService) RestartServices(tx interface{}, ids []uint) error {
 			if err := corePtr.RemoveService(srv.Tag); err != nil && err != nil && err.Error() != "not found" {
 				return err
 			}
-			srvModel := model.Service{
+			srvModel := db.Service{
 				Id:      srv.Id,
 				Type:    srv.Type,
 				Tag:     srv.Tag,
@@ -200,7 +200,7 @@ func (s *ServicesService) RestartServices(tx interface{}, ids []uint) error {
 			if srv.TlsId > 0 {
 				for _, tls := range cfg.TLS {
 					if tls.Id == srv.TlsId {
-						srvModel.Tls = &model.Tls{Id: tls.Id, Name: tls.Name, Server: tls.Server, Client: tls.Client}
+						srvModel.Tls = &db.Tls{Id: tls.Id, Name: tls.Name, Server: tls.Server, Client: tls.Client}
 						break
 					}
 				}

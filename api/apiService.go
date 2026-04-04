@@ -5,9 +5,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/logger"
-	"github.com/alireza0/s-ui/service"
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -201,13 +200,6 @@ func (a *ApiService) GetLogs(c *gin.Context) {
 	jsonObj(c, logs, nil)
 }
 
-func (a *ApiService) CheckChanges(c *gin.Context) {
-	actor := c.Query("a")
-	chngKey := c.Query("k")
-	count := c.Query("c")
-	changes := a.ConfigService.GetChanges(actor, chngKey, count)
-	jsonObj(c, changes, nil)
-}
 
 func (a *ApiService) GetKeypairs(c *gin.Context) {
 	kType := c.Query("k")
@@ -216,17 +208,6 @@ func (a *ApiService) GetKeypairs(c *gin.Context) {
 	jsonObj(c, keypair, nil)
 }
 
-func (a *ApiService) GetDb(c *gin.Context) {
-	exclude := c.Query("exclude")
-	db, err := database.GetDb(exclude)
-	if err != nil {
-		jsonMsg(c, "", err)
-		return
-	}
-	c.Header("Content-Type", "application/octet-stream")
-	c.Header("Content-Disposition", "attachment; filename=s-ui_"+time.Now().Format("20060102-150405")+".db")
-	c.Writer.Write(db)
-}
 
 func (a *ApiService) Login(c *gin.Context) {
 	remoteIP := getRemoteIp(c)
@@ -294,16 +275,6 @@ func (a *ApiService) RestartSb(c *gin.Context) {
 	jsonMsg(c, "restartSb", err)
 }
 
-func (a *ApiService) ImportDb(c *gin.Context) {
-	file, _, err := c.Request.FormFile("db")
-	if err != nil {
-		jsonMsg(c, "", err)
-		return
-	}
-	defer file.Close()
-	err = database.ImportDB(file)
-	jsonMsg(c, "", err)
-}
 
 func (a *ApiService) Logout(c *gin.Context) {
 	loginUser := GetLoginUser(c)

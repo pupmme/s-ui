@@ -3,7 +3,7 @@ package api
 import (
 	"strings"
 
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/util/common"
 
 	"github.com/gin-gonic/gin"
 )
@@ -42,8 +42,6 @@ func (a *APIHandler) postHandler(c *gin.Context) {
 		a.ApiService.RestartApp(c)
 	case "restartSb":
 		a.ApiService.RestartSb(c)
-	case "importdb":
-		a.ApiService.ImportDb(c)
 	default:
 		jsonMsg(c, "failed", common.NewError("unknown action: ", action))
 	}
@@ -75,12 +73,8 @@ func (a *APIHandler) getHandler(c *gin.Context) {
 		a.ApiService.GetOnlines(c)
 	case "logs":
 		a.ApiService.GetLogs(c)
-	case "changes":
-		a.ApiService.CheckChanges(c)
 	case "keypairs":
 		a.ApiService.GetKeypairs(c)
-	case "getdb":
-		a.ApiService.GetDb(c)
 	case "singbox-config":
 		a.ApiService.GetSingboxConfig(c)
 	case "checkOutbound":

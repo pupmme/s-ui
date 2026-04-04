@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/alireza0/s-ui/logger"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/util/common"
 
 	"github.com/gin-gonic/gin"
 )
@@ -46,8 +46,6 @@ func (a *APIv2Handler) postHandler(c *gin.Context) {
 		a.ApiService.RestartApp(c)
 	case "restartSb":
 		a.ApiService.RestartSb(c)
-	case "importdb":
-		a.ApiService.ImportDb(c)
 	default:
 		jsonMsg(c, "failed", common.NewError("unknown action: ", action))
 	}

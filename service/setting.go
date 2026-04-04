@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/db"
-	"github.com/alireza0/s-ui/logger"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/util/common"
 )
 
 var defaultConfig = `{

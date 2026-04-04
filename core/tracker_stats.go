@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alireza0/s-ui/database/model"
+	"github.com/pupmme/sub/db"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing/common/atomic"
@@ -83,24 +83,24 @@ func (c *StatsTracker) RoutedPacketConnection(ctx context.Context, conn network.
 	return bufio.NewInt64CounterPacketConn(conn, readCounter, nil, writeCounter, nil)
 }
 
-func (c *StatsTracker) GetStats() *[]model.Stats {
+func (c *StatsTracker) GetStats() *[]db.Stats {
 	c.access.Lock()
 	defer c.access.Unlock()
 
 	dt := time.Now().Unix()
 
-	s := []model.Stats{}
+	s := []db.Stats{}
 	for inbound, counter := range c.inbounds {
 		down := counter.write.Swap(0)
 		up := counter.read.Swap(0)
 		if down > 0 || up > 0 {
-			s = append(s, model.Stats{
+			s = append(s, db.Stats{
 				DateTime:  dt,
 				Resource:  "inbound",
 				Tag:       inbound,
 				Direction: false,
 				Traffic:   down,
-			}, model.Stats{
+			}, db.Stats{
 				DateTime:  dt,
 				Resource:  "inbound",
 				Tag:       inbound,
@@ -114,13 +114,13 @@ func (c *StatsTracker) GetStats() *[]model.Stats {
 		down := counter.write.Swap(0)
 		up := counter.read.Swap(0)
 		if down > 0 || up > 0 {
-			s = append(s, model.Stats{
+			s = append(s, db.Stats{
 				DateTime:  dt,
 				Resource:  "outbound",
 				Tag:       outbound,
 				Direction: false,
 				Traffic:   down,
-			}, model.Stats{
+			}, db.Stats{
 				DateTime:  dt,
 				Resource:  "outbound",
 				Tag:       outbound,
@@ -134,13 +134,13 @@ func (c *StatsTracker) GetStats() *[]model.Stats {
 		down := counter.write.Swap(0)
 		up := counter.read.Swap(0)
 		if down > 0 || up > 0 {
-			s = append(s, model.Stats{
+			s = append(s, db.Stats{
 				DateTime:  dt,
 				Resource:  "user",
 				Tag:       user,
 				Direction: false,
 				Traffic:   down,
-			}, model.Stats{
+			}, db.Stats{
 				DateTime:  dt,
 				Resource:  "user",
 				Tag:       user,

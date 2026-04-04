@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alireza0/s-ui/config"
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/logger"
+	"github.com/pupmme/sub/config"
+	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/logger"
 
 	"github.com/sagernet/sing-box/common/tls"
 	"github.com/shirou/gopsutil/v4/cpu"
@@ -263,13 +263,13 @@ func (s *ServerService) GetDatabaseInfo() map[string]int64 {
 
 	var clientsCount, inboundsCount, outboundsCount, servicesCount, endpointsCount, clientUp, clientDown int64
 
-	db.Model(&model.Client{}).Count(&clientsCount)
-	db.Model(&model.Inbound{}).Count(&inboundsCount)
-	db.Model(&model.Outbound{}).Count(&outboundsCount)
-	db.Model(&model.Service{}).Count(&servicesCount)
-	db.Model(&model.Endpoint{}).Count(&endpointsCount)
-	db.Model(&model.Client{}).Select("COALESCE(SUM(up+total_up),0)").Scan(&clientUp)
-	db.Model(&model.Client{}).Select("COALESCE(SUM(down+total_down),0)").Scan(&clientDown)
+	db.Model(&db.Client{}).Count(&clientsCount)
+	db.Model(&db.Inbound{}).Count(&inboundsCount)
+	db.Model(&db.Outbound{}).Count(&outboundsCount)
+	db.Model(&db.Service{}).Count(&servicesCount)
+	db.Model(&db.Endpoint{}).Count(&endpointsCount)
+	db.Model(&db.Client{}).Select("COALESCE(SUM(up+total_up),0)").Scan(&clientUp)
+	db.Model(&db.Client{}).Select("COALESCE(SUM(down+total_down),0)").Scan(&clientDown)
 
 	info["clients"] = clientsCount
 	info["inbounds"] = inboundsCount

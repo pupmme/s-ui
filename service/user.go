@@ -4,22 +4,22 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/db"
-	"github.com/alireza0/s-ui/logger"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/util/common"
 )
 
 type UserService struct{}
 
 // GetFirstUser returns the first admin user.
-func (s *UserService) GetFirstUser() (*model.User, error) {
+func (s *UserService) GetFirstUser() (*db.User, error) {
 	users := db.GetUsers()
 	if len(users) == 0 {
 		return nil, common.NewError("no users found")
 	}
-	return &model.User{
+	return &db.User{
 		Id:       users[0].Id,
 		Username: users[0].Username,
 		Password: users[0].Password,
@@ -52,12 +52,12 @@ func (s *UserService) Login(username string, password string, remoteIP string) (
 	return user.Username, nil
 }
 
-func (s *UserService) CheckUser(username string, password string, remoteIP string) *model.User {
+func (s *UserService) CheckUser(username string, password string, remoteIP string) *db.User {
 	cfg := db.Get()
 	for i := range cfg.Users {
 		u := &cfg.Users[i]
 		if u.Username == username && u.Password == password {
-			return &model.User{
+			return &db.User{
 				Id:       u.Id,
 				Username: u.Username,
 				Password: u.Password,
@@ -69,13 +69,13 @@ func (s *UserService) CheckUser(username string, password string, remoteIP strin
 }
 
 // GetUsers returns panel admin users plus sub inbound users.
-func (s *UserService) GetUsers() (*[]model.User, error) {
-	var users []model.User
+func (s *UserService) GetUsers() (*[]db.User, error) {
+	var users []db.User
 
 	// 1. Panel admin users
 	cfg := db.Get()
 	for _, u := range cfg.Users {
-		users = append(users, model.User{
+		users = append(users, db.User{
 			Id:         u.Id,
 			Username:   u.Username,
 			Password:   u.Password,
@@ -93,7 +93,7 @@ func (s *UserService) GetUsers() (*[]model.User, error) {
 }
 
 // GetSubUsers reads inbound users from /etc/sub/singbox.json.
-func (s *UserService) GetSubUsers() ([]model.User, error) {
+func (s *UserService) GetSubUsers() ([]db.User, error) {
 	data, err := os.ReadFile("/etc/sub/singbox.json")
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ func (s *UserService) GetSubUsers() ([]model.User, error) {
 		return nil, err
 	}
 
-	var users []model.User
+	var users []db.User
 	uid := uint(1000)
 	for _, inbound := range sb.Inbounds {
 		for _, u := range inbound.Users {
@@ -112,7 +112,7 @@ func (s *UserService) GetSubUsers() ([]model.User, error) {
 			if email == "" {
 				email = u.UUID
 			}
-			users = append(users, model.User{
+			users = append(users, db.User{
 				Id:       uid,
 				Username: email,
 			})
@@ -141,8 +141,8 @@ func (s *UserService) LoadTokens() ([]byte, error) {
 	return []byte("[]"), nil // Token功能已禁用
 }
 
-func (s *UserService) GetUserTokens(username string) (*[]model.Tokens, error) {
-	return &[]model.Tokens{}, nil
+func (s *UserService) GetUserTokens(username string) (*[]db.Tokens, error) {
+	return &[]db.Tokens{}, nil
 }
 
 func (s *UserService) AddToken(username string, expiry int64, desc string) (string, error) {

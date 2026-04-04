@@ -3,6 +3,7 @@ package cronjob
 import (
 	"time"
 
+	"github.com/pupmme/sub/service"
 	"github.com/robfig/cron/v3"
 )
 
@@ -19,18 +20,8 @@ func (c *CronJob) Start(loc *time.Location, trafficAge int) error {
 	c.cron.Start()
 
 	go func() {
-		// Start stats job
-		c.cron.AddJob("@every 10s", NewStatsJob(trafficAge > 0))
-		// Start expiry job
-		c.cron.AddJob("@every 1m", NewDepleteJob())
-		// Start deleting old stats
-		if trafficAge > 0 {
-			c.cron.AddJob("@daily", NewDelStatsJob(trafficAge))
-		}
 		// Start core if it is not running
 		c.cron.AddJob("@every 5s", NewCheckCoreJob())
-		// database WAL checkpoint
-		c.cron.AddJob("@every 10m", NewWALCheckpointJob())
 	}()
 
 	return nil

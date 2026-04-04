@@ -7,8 +7,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/util/common"
 )
 
 var InboundTypeWithLink = []string{"socks", "http", "mixed", "shadowsocks", "naive", "hysteria", "hysteria2", "anytls", "tuic", "vless", "trojan", "vmess"}
@@ -18,7 +18,7 @@ type LinkParam struct {
 	Value string
 }
 
-func LinkGenerator(clientConfig json.RawMessage, i *model.Inbound, hostname string) []string {
+func LinkGenerator(clientConfig json.RawMessage, i *db.Inbound, hostname string) []string {
 	inbound, err := i.MarshalFull()
 	if err != nil {
 		return []string{}
@@ -101,7 +101,7 @@ func LinkGenerator(clientConfig json.RawMessage, i *model.Inbound, hostname stri
 	return []string{}
 }
 
-func prepareTls(t *model.Tls) map[string]interface{} {
+func prepareTls(t *db.Tls) map[string]interface{} {
 	var iTls, oTls map[string]interface{}
 	if err := json.Unmarshal(t.Client, &oTls); err != nil {
 		return nil

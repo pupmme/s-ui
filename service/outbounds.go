@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/db"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/util/common"
 )
 
 type OutboundService struct{}
@@ -39,7 +39,7 @@ func (o *OutboundService) GetAllConfig() ([]json.RawMessage, error) {
 	cfg := db.Get()
 	var outboundsJson []json.RawMessage
 	for _, outbound := range cfg.Outbounds {
-		outModel := model.Outbound{
+		outModel := db.Outbound{
 			Id:      outbound.Id,
 			Type:    outbound.Type,
 			Tag:     outbound.Tag,
@@ -60,7 +60,7 @@ func (s *OutboundService) Save(tx interface{}, act string, data json.RawMessage)
 
 	switch act {
 	case "new", "edit":
-		var outbound model.Outbound
+		var outbound db.Outbound
 		if err := outbound.UnmarshalJSON(data); err != nil {
 			return err
 		}

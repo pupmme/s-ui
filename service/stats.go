@@ -5,9 +5,9 @@ import (
 	"sort"
 	"time"
 
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/db"
+	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/db"
 )
 
 type onlines struct {
@@ -91,12 +91,12 @@ func (s *StatsService) SaveStats(enableTraffic bool) error {
 	return database.SaveConfig()
 }
 
-func (s *StatsService) GetStats(resource string, tag string, limit int) ([]model.Stats, error) {
+func (s *StatsService) GetStats(resource string, tag string, limit int) ([]db.Stats, error) {
 	cfg := db.Get()
 	currentTime := time.Now().Unix()
 	timeDiff := currentTime - (int64(limit) * 3600)
 
-	var result []model.Stats
+	var result []db.Stats
 	resources := []string{resource}
 	if resource == "endpoint" {
 		resources = []string{"inbound", "outbound"}
@@ -105,7 +105,7 @@ func (s *StatsService) GetStats(resource string, tag string, limit int) ([]model
 		if stat.DateTime > timeDiff {
 			for _, r := range resources {
 				if stat.Resource == r && stat.Tag == tag {
-					result = append(result, model.Stats{
+					result = append(result, db.Stats{
 						DateTime:  stat.DateTime,
 						Resource:  stat.Resource,
 						Tag:       stat.Tag,
@@ -123,7 +123,7 @@ func (s *StatsService) GetStats(resource string, tag string, limit int) ([]model
 }
 
 // downsampleStats reduces stats to maxRows rows.
-func (s *StatsService) downsampleStats(stats []model.Stats, maxRows int) []model.Stats {
+func (s *StatsService) downsampleStats(stats []db.Stats, maxRows int) []db.Stats {
 	if len(stats) <= maxRows {
 		return stats
 	}
@@ -134,7 +134,7 @@ func (s *StatsService) downsampleStats(stats []model.Stats, maxRows int) []model
 	if bucketSpan == 0 {
 		bucketSpan = 1
 	}
-	downsampled := make([]model.Stats, 0, maxRows)
+	downsampled := make([]db.Stats, 0, maxRows)
 	for i := 0; i < numBuckets; i++ {
 		bucketStart := timeMin + int64(i)*bucketSpan
 		bucketEnd := timeMin + int64(i+1)*bucketSpan
@@ -154,7 +154,7 @@ func (s *StatsService) downsampleStats(stats []model.Stats, maxRows int) []model
 			if count > 0 {
 				avg = sum / int64(count)
 			}
-			downsampled = append(downsampled, model.Stats{
+			downsampled = append(downsampled, db.Stats{
 				DateTime:  bucketStart,
 				Resource:  stats[0].Resource,
 				Tag:       stats[0].Tag,

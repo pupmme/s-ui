@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alireza0/s-ui/core"
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/logger"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/core"
+	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/util/common"
 )
 
 var (
@@ -244,7 +244,7 @@ func (s *ConfigService) Save(obj string, act string, data json.RawMessage, initU
 	}
 
 	dt := time.Now().Unix()
-	err = tx.Create(&model.Changes{
+	err = tx.Create(&db.Changes{
 		DateTime: dt,
 		Actor:    loginUser,
 		Key:      obj,
@@ -267,7 +267,7 @@ func (s *ConfigService) CheckChanges(lu string) (bool, error) {
 	if LastUpdate == 0 {
 		db := database.GetDB()
 		var count int64
-		err := db.Model(model.Changes{}).Where("date_time > " + lu).Count(&count).Error
+		err := db.Model(db.Changes{}).Where("date_time > " + lu).Count(&count).Error
 		if err == nil {
 			LastUpdate = time.Now().Unix()
 		}
@@ -278,7 +278,7 @@ func (s *ConfigService) CheckChanges(lu string) (bool, error) {
 	}
 }
 
-func (s *ConfigService) GetChanges(actor string, chngKey string, count string) []model.Changes {
+func (s *ConfigService) GetChanges(actor string, chngKey string, count string) []db.Changes {
 	c, _ := strconv.Atoi(count)
 	whereString := "`id`>0"
 	if len(actor) > 0 {
@@ -288,8 +288,8 @@ func (s *ConfigService) GetChanges(actor string, chngKey string, count string) [
 		whereString += " and `key`='" + chngKey + "'"
 	}
 	db := database.GetDB()
-	var chngs []model.Changes
-	err := db.Model(model.Changes{}).Where(whereString).Order("`id` desc").Limit(c).Scan(&chngs).Error
+	var chngs []db.Changes
+	err := db.Model(db.Changes{}).Where(whereString).Order("`id` desc").Limit(c).Scan(&chngs).Error
 	if err != nil {
 		logger.Warning(err)
 	}

@@ -11,9 +11,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/logger"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/util/common"
 
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
@@ -45,7 +45,7 @@ func (s *WarpService) getWarpInfo(deviceId string, accessToken string) ([]byte, 
 	return buffer.Bytes(), nil
 }
 
-func (s *WarpService) RegisterWarp(ep *model.Endpoint) error {
+func (s *WarpService) RegisterWarp(ep *db.Endpoint) error {
 	tos := time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
 	privateKey, _ := wgtypes.GenerateKey()
 	publicKey := privateKey.PublicKey().String()
@@ -176,7 +176,7 @@ func (s *WarpService) getReserved(clientID string) []int {
 	return reserved
 }
 
-func (s *WarpService) SetWarpLicense(old_license string, ep *model.Endpoint) error {
+func (s *WarpService) SetWarpLicense(old_license string, ep *db.Endpoint) error {
 	var warpData map[string]string
 	err := json.Unmarshal(ep.Ext, &warpData)
 	if err != nil {

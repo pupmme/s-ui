@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alireza0/s-ui/api"
-	"github.com/alireza0/s-ui/config"
-	"github.com/alireza0/s-ui/logger"
-	"github.com/alireza0/s-ui/middleware"
-	"github.com/alireza0/s-ui/network"
-	"github.com/alireza0/s-ui/service"
+	"github.com/pupmme/sub/api"
+	"github.com/pupmme/sub/config"
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/middleware"
+	"github.com/pupmme/sub/network"
+	"github.com/pupmme/sub/service"
 
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/sessions"

@@ -3,10 +3,10 @@ package service
 import (
 	"encoding/json"
 
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/db"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/util/common"
 )
 
 type TlsService struct {
@@ -14,11 +14,11 @@ type TlsService struct {
 	ServicesService
 }
 
-func (s *TlsService) GetAll() ([]model.Tls, error) {
+func (s *TlsService) GetAll() ([]db.Tls, error) {
 	cfg := db.Get()
-	result := make([]model.Tls, 0, len(cfg.TLS))
+	result := make([]db.Tls, 0, len(cfg.TLS))
 	for _, tls := range cfg.TLS {
-		result = append(result, model.Tls{
+		result = append(result, db.Tls{
 			Id:     tls.Id,
 			Name:   tls.Name,
 			Server: tls.Server,
@@ -34,7 +34,7 @@ func (s *TlsService) Save(tx interface{}, action string, data json.RawMessage, h
 
 	switch action {
 	case "new", "edit":
-		var tls model.Tls
+		var tls db.Tls
 		if err := json.Unmarshal(data, &tls); err != nil {
 			return err
 		}

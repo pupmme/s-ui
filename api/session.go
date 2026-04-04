@@ -1,10 +1,6 @@
 package api
 
 import (
-	"encoding/gob"
-
-	"github.com/alireza0/s-ui/database/model"
-
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
@@ -12,10 +8,6 @@ import (
 const (
 	loginUser = "LOGIN_USER"
 )
-
-func init() {
-	gob.Register(model.User{})
-}
 
 func SetLoginUser(c *gin.Context, userName string, maxAge int) error {
 	options := sessions.Options{

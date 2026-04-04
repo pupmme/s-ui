@@ -3,13 +3,13 @@ package util
 import (
 	"encoding/json"
 
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/util/common"
 
-	"github.com/alireza0/s-ui/database/model"
+	"github.com/pupmme/sub/db"
 )
 
 // Fill Inbound's out_json
-func FillOutJson(i *model.Inbound, hostname string) error {
+func FillOutJson(i *db.Inbound, hostname string) error {
 	switch i.Type {
 	case "direct", "tun", "redirect", "tproxy":
 		return nil
@@ -75,7 +75,7 @@ func FillOutJson(i *model.Inbound, hostname string) error {
 }
 
 // addTls function
-func addTls(out *map[string]interface{}, tls *model.Tls) {
+func addTls(out *map[string]interface{}, tls *db.Tls) {
 	var tlsServer, tlsConfig map[string]interface{}
 	err := json.Unmarshal(tls.Server, &tlsServer)
 	if err != nil {

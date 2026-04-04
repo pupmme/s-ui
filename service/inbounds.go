@@ -6,11 +6,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/db"
-	"github.com/alireza0/s-ui/util"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/util"
+	"github.com/pupmme/sub/util/common"
 )
 
 type InboundService struct {
@@ -106,13 +106,13 @@ func (s *InboundService) getClientNamesByInbound(inboundId uint) []string {
 	return names
 }
 
-func (s *InboundService) FromIds(ids []uint) ([]*model.Inbound, error) {
+func (s *InboundService) FromIds(ids []uint) ([]*db.Inbound, error) {
 	cfg := db.Get()
-	var result []*model.Inbound
+	var result []*db.Inbound
 	for _, inb := range cfg.Inbounds {
 		for _, id := range ids {
 			if inb.Id == id {
-				result = append(result, &model.Inbound{
+				result = append(result, &db.Inbound{
 					Id:      inb.Id,
 					Type:    inb.Type,
 					Tag:     inb.Tag,
@@ -134,7 +134,7 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 
 	switch act {
 	case "new", "edit":
-		var inbound model.Inbound
+		var inbound db.Inbound
 		if err := inbound.UnmarshalJSON(data); err != nil {
 			return err
 		}
@@ -143,7 +143,7 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 			for i := range cfg.TLS {
 				if cfg.TLS[i].Id == inbound.TlsId {
 					tls := cfg.TLS[i]
-					inbound.Tls = &model.Tls{
+					inbound.Tls = &db.Tls{
 						Id:     tls.Id,
 						Name:   tls.Name,
 						Server: tls.Server,
@@ -284,7 +284,7 @@ func (s *InboundService) UpdateOutJsons(tx interface{}, inboundIds []uint, hostn
 				continue
 			}
 			inb := &cfg.Inbounds[i]
-			inbModel := &model.Inbound{
+			inbModel := &db.Inbound{
 				Id:      inb.Id,
 				Type:    inb.Type,
 				Tag:     inb.Tag,
@@ -296,7 +296,7 @@ func (s *InboundService) UpdateOutJsons(tx interface{}, inboundIds []uint, hostn
 			if inb.TlsId > 0 {
 				for _, tls := range cfg.TLS {
 					if tls.Id == inb.TlsId {
-						inbModel.Tls = &model.Tls{
+						inbModel.Tls = &db.Tls{
 							Id:     tls.Id,
 							Name:   tls.Name,
 							Server: tls.Server,
@@ -321,7 +321,7 @@ func (s *InboundService) GetAllConfig() ([]json.RawMessage, error) {
 	cfg := db.Get()
 	var inboundsJson []json.RawMessage
 	for _, inp := range cfg.Inbounds {
-		inbModel := model.Inbound{
+		inbModel := db.Inbound{
 			Id:      inp.Id,
 			Type:    inp.Type,
 			Tag:     inp.Tag,
@@ -333,7 +333,7 @@ func (s *InboundService) GetAllConfig() ([]json.RawMessage, error) {
 		if inp.TlsId > 0 {
 			for _, tls := range cfg.TLS {
 				if tls.Id == inp.TlsId {
-					inbModel.Tls = &model.Tls{
+					inbModel.Tls = &db.Tls{
 						Id:     tls.Id,
 						Name:   tls.Name,
 						Server: tls.Server,
@@ -488,7 +488,7 @@ func (s *InboundService) RestartInbounds(tx interface{}, ids []uint) error {
 			}
 			corePtr.GetInstance().ConnTracker().CloseConnByInbound(inp.Tag)
 
-			inbModel := &model.Inbound{
+			inbModel := &db.Inbound{
 				Id:      inp.Id,
 				Type:    inp.Type,
 				Tag:     inp.Tag,

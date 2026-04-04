@@ -3,10 +3,10 @@ package service
 import (
 	"encoding/json"
 
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/db"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/util/common"
 )
 
 type EndpointService struct {
@@ -41,7 +41,7 @@ func (o *EndpointService) GetAllConfig() ([]json.RawMessage, error) {
 	cfg := db.Get()
 	var endpointsJson []json.RawMessage
 	for _, endpoint := range cfg.Endpoints {
-		epModel := model.Endpoint{
+		epModel := db.Endpoint{
 			Id:      endpoint.Id,
 			Type:    endpoint.Type,
 			Tag:     endpoint.Tag,
@@ -63,7 +63,7 @@ func (s *EndpointService) Save(tx interface{}, act string, data json.RawMessage)
 
 	switch act {
 	case "new", "edit":
-		var endpoint model.Endpoint
+		var endpoint db.Endpoint
 		if err := endpoint.UnmarshalJSON(data); err != nil {
 			return err
 		}

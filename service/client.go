@@ -5,30 +5,30 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/database/model"
-	"github.com/alireza0/s-ui/db"
-	"github.com/alireza0/s-ui/logger"
-	"github.com/alireza0/s-ui/util"
-	"github.com/alireza0/s-ui/util/common"
+	"github.com/pupmme/sub/database"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/util"
+	"github.com/pupmme/sub/util/common"
 )
 
 type ClientService struct{}
 
-func (s *ClientService) Get(id string) (*[]model.Client, error) {
+func (s *ClientService) Get(id string) (*[]db.Client, error) {
 	if id == "" {
 		return s.GetAll()
 	}
 	return s.getById(id)
 }
 
-func (s *ClientService) getById(id string) (*[]model.Client, error) {
+func (s *ClientService) getById(id string) (*[]db.Client, error) {
 	cfg := db.Get()
 	idSet := make(map[string]bool)
 	for _, i := range strings.Split(id, ",") {
 		idSet[i] = true
 	}
-	var result []model.Client
+	var result []db.Client
 	for _, c := range cfg.Clients {
 		if idSet[common.Itoa(int(c.Id))] {
 			result = append(result, s.dbClientToModel(c))
@@ -37,17 +37,17 @@ func (s *ClientService) getById(id string) (*[]model.Client, error) {
 	return &result, nil
 }
 
-func (s *ClientService) GetAll() (*[]model.Client, error) {
+func (s *ClientService) GetAll() (*[]db.Client, error) {
 	cfg := db.Get()
-	result := make([]model.Client, 0, len(cfg.Clients))
+	result := make([]db.Client, 0, len(cfg.Clients))
 	for _, c := range cfg.Clients {
 		result = append(result, s.dbClientToModel(c))
 	}
 	return &result, nil
 }
 
-func (s *ClientService) dbClientToModel(c db.Client) model.Client {
-	return model.Client{
+func (s *ClientService) dbClientToModel(c db.Client) db.Client {
+	return db.Client{
 		Id:         c.Id,
 		Enable:     c.Enable,
 		Name:       c.Name,
@@ -69,7 +69,7 @@ func (s *ClientService) dbClientToModel(c db.Client) model.Client {
 	}
 }
 
-func (s *ClientService) modelToDbClient(m model.Client) db.Client {
+func (s *ClientService) modelToDbClient(m db.Client) db.Client {
 	return db.Client{
 		Id:         m.Id,
 		Enable:     m.Enable,
@@ -99,11 +99,11 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 
 	switch act {
 	case "new", "edit":
-		var client model.Client
+		var client db.Client
 		if err = json.Unmarshal(data, &client); err != nil {
 			return nil, err
 		}
-		err = s.updateLinksWithFixedInboundsJSON([]*model.Client{&client}, hostname)
+		err = s.updateLinksWithFixedInboundsJSON([]*db.Client{&client}, hostname)
 		if err != nil {
 			return nil, err
 		}
@@ -144,7 +144,7 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 		}
 
 	case "addbulk":
-		var clients []*model.Client
+		var clients []*db.Client
 		if err = json.Unmarshal(data, &clients); err != nil {
 			return nil, err
 		}
@@ -170,7 +170,7 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 		}
 
 	case "editbulk":
-		var clients []*model.Client
+		var clients []*db.Client
 		if err = json.Unmarshal(data, &clients); err != nil {
 			return nil, err
 		}
@@ -274,7 +274,7 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 	return inboundIds, nil
 }
 
-func (s *ClientService) updateLinksWithFixedInboundsJSON(clients []*model.Client, hostname string) error {
+func (s *ClientService) updateLinksWithFixedInboundsJSON(clients []*db.Client, hostname string) error {
 	if len(clients) == 0 {
 		return nil
 	}
@@ -287,11 +287,11 @@ func (s *ClientService) updateLinksWithFixedInboundsJSON(clients []*model.Client
 
 	// Load inbounds that support subscription links
 	cfg := db.Get()
-	var inbounds []model.Inbound
+	var inbounds []db.Inbound
 	for _, inb := range cfg.Inbounds {
 		for _, id := range inboundIds {
 			if inb.Id == id && slicesContains(util.InboundTypeWithLink, inb.Type) {
-				inbounds = append(inbounds, model.Inbound{
+				inbounds = append(inbounds, db.Inbound{
 					Id:      inb.Id,
 					Type:    inb.Type,
 					Tag:     inb.Tag,
@@ -341,11 +341,11 @@ func (s *ClientService) UpdateClientsOnInboundAddJSON(initIds string, inboundId 
 
 	// Load inbound
 	cfg := db.Get()
-	var inbound model.Inbound
+	var inbound db.Inbound
 	var found bool
 	for _, inb := range cfg.Inbounds {
 		if inb.Id == inboundId {
-			inbound = model.Inbound{
+			inbound = db.Inbound{
 				Id:      inb.Id,
 				Type:    inb.Type,
 				Tag:     inb.Tag,
@@ -375,7 +375,7 @@ func (s *ClientService) UpdateClientsOnInboundAddJSON(initIds string, inboundId 
 		// Add links
 		var clientLinks, newClientLinks []map[string]string
 		_ = json.Unmarshal(c.Links, &clientLinks)
-		inbForLink := model.Inbound{
+		inbForLink := db.Inbound{
 			Id:      inbound.Id,
 			Type:    inbound.Type,
 			Tag:     inbound.Tag,
@@ -456,7 +456,7 @@ func (s *ClientService) UpdateLinksByInboundChangeJSON(inbound db.Inbound, oldTa
 		var clientLinks, newClientLinks []map[string]string
 		_ = json.Unmarshal(c.Links, &clientLinks)
 
-		inbForLink := model.Inbound{
+		inbForLink := db.Inbound{
 			Id:      inbound.Id,
 			Type:    inbound.Type,
 			Tag:     inbound.Tag,
@@ -606,7 +606,7 @@ func (s *ClientService) ResetClientsJSON(dt int64) ([]uint, error) {
 	return inboundIds, nil
 }
 
-func (s *ClientService) findInboundsChangesJSON(client *model.Client, fillOmitted bool) ([]uint, error) {
+func (s *ClientService) findInboundsChangesJSON(client *db.Client, fillOmitted bool) ([]uint, error) {
 	cfg := db.Get()
 	var oldClient *db.Client
 	for _, c := range cfg.Clients {
