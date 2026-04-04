@@ -70,19 +70,11 @@ config_after_install() {
         echo -e "Enter the ${yellow}panel path${plain} (leave blank for existing/default value):"
         read config_path
 
-        # Sub configuration
-        echo -e "Enter the ${yellow}subscription port${plain} (leave blank for existing/default value):"
-        read config_subPort
-        echo -e "Enter the ${yellow}subscription path${plain} (leave blank for existing/default value):" 
-        read config_subPath
-
         # Set configs
         echo -e "${yellow}Initializing, please wait...${plain}"
         params=""
         [ -z "$config_port" ] || params="$params -port $config_port"
         [ -z "$config_path" ] || params="$params -path $config_path"
-        [ -z "$config_subPort" ] || params="$params -subPort $config_subPort"
-        [ -z "$config_subPath" ] || params="$params -subPath $config_subPath"
         /usr/local/s-ui/sui setting ${params}
 
         read -p "Do you want to change admin credentials [y/n]? ": admin_confirm
@@ -135,20 +127,20 @@ install_s-ui() {
     cd /tmp/
 
     if [ $# == 0 ]; then
-        last_version=$(curl -Ls "https://api.github.com/repos/alireza0/s-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+        last_version=$(curl -Ls "https://api.github.com/repos/pupmme/s-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
         if [[ ! -n "$last_version" ]]; then
             echo -e "${red}Failed to fetch s-ui version, it maybe due to Github API restrictions, please try it later${plain}"
             exit 1
         fi
         echo -e "Got s-ui latest version: ${last_version}, beginning the installation..."
-        wget -N --no-check-certificate -O /tmp/s-ui-linux-$(arch).tar.gz https://github.com/alireza0/s-ui/releases/download/${last_version}/s-ui-linux-$(arch).tar.gz
+        wget -N --no-check-certificate -O /tmp/s-ui-linux-$(arch).tar.gz https://github.com/pupmme/s-ui/releases/download/${last_version}/s-ui-linux-$(arch).tar.gz
         if [[ $? -ne 0 ]]; then
             echo -e "${red}Downloading s-ui failed, please be sure that your server can access Github ${plain}"
             exit 1
         fi
     else
         last_version=$1
-        url="https://github.com/alireza0/s-ui/releases/download/${last_version}/s-ui-linux-$(arch).tar.gz"
+        url="https://github.com/pupmme/s-ui/releases/download/${last_version}/s-ui-linux-$(arch).tar.gz"
         echo -e "Beginning the install s-ui v$1"
         wget -N --no-check-certificate -O /tmp/s-ui-linux-$(arch).tar.gz ${url}
         if [[ $? -ne 0 ]]; then
