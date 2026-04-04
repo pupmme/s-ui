@@ -84,24 +84,22 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	}
 
 	engine.Use(gzip.Gzip(gzip.DefaultCompression))
-	assetsBasePath := "/assets/"
 
 	store := cookie.NewStore(secret)
 	engine.Use(sessions.Sessions("s-ui", store))
 
+	// Serve assets under base_url/assets/ so SPA can load them
+	assetsBasePath := base_url + "assets/"
 	engine.Use(func(c *gin.Context) {
-		uri := c.Request.RequestURI
-		if strings.HasPrefix(uri, assetsBasePath) {
+		if strings.HasPrefix(c.Request.URL.Path, assetsBasePath) {
 			c.Header("Cache-Control", "max-age=31536000")
 		}
 	})
 
-	// Serve the assets folder
 	assetsFS, err := fs.Sub(content, "dist/assets")
 	if err != nil {
 		panic(err)
 	}
-
 	engine.StaticFS(assetsBasePath, http.FS(assetsFS))
 
 	// apiv2 token auth disabled
@@ -140,7 +138,6 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 }
 
 func (s *Server) Start() (err error) {
-	//This is an anonymous function, no function name
 	defer func() {
 		if err != nil {
 			s.Stop()
@@ -221,6 +218,9 @@ func (s *Server) Stop() error {
 		err = s.listener.Close()
 		if err != nil {
 			s.cancel()
+			if s.listener != nil {
+				_ = s.listener.Close()
+			}
 			return err
 		}
 	}
