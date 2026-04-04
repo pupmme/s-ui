@@ -1,3 +1,13 @@
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+sub
 s-ui
-go.sum
+vendor/
+.env
 .DS_Store
+Thumbs.db
