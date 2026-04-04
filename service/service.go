@@ -52,7 +52,9 @@ func (c *Core) GetInstance() *core.Core {
 	return core.GetCore()
 }
 
-// buildSingboxConfig builds a minimal valid sing-box config from db.Config.
+// buildSingboxConfig builds a complete sing-box config from db.Config.
+// db.Inbound.Options contains the raw sing-box JSON for each inbound.
+// db.Outbound.Options contains the raw sing-box JSON for each outbound.
 func buildSingboxConfig() ([]byte, error) {
 	logCfg := config.Get().Log
 	level := "info"
@@ -60,15 +62,25 @@ func buildSingboxConfig() ([]byte, error) {
 		level = "debug"
 	}
 
-	// Collect inbounds from db
 	cfg := db.Get()
+
+	// Build inbounds: merge Addrs + TLS + Options (Options contains full sing-box fields)
 	inbounds := make([]json.RawMessage, 0, len(cfg.Inbounds))
 	for _, in := range cfg.Inbounds {
-		inMap := map[string]interface{}{
-			"type": in.Type,
-			"tag":  in.Tag,
+		// Start from Options (raw sing-box JSON for this inbound)
+		var inMap map[string]interface{}
+		if len(in.Options) > 0 {
+			json.Unmarshal(in.Options, &inMap)
 		}
-		// Parse address from addrs if present
+		if inMap == nil {
+			inMap = make(map[string]interface{})
+		}
+
+		// Always set type and tag from db.Inbound
+		inMap["type"] = in.Type
+		inMap["tag"] = in.Tag
+
+		// Merge listen/port from Addrs
 		if len(in.Addrs) > 0 {
 			var addr struct {
 				Listen    string `json:"listen"`
@@ -77,40 +89,59 @@ func buildSingboxConfig() ([]byte, error) {
 			json.Unmarshal(in.Addrs, &addr)
 			if addr.Listen != "" {
 				inMap["listen"] = addr.Listen
+			} else {
+				inMap["listen"] = "0.0.0.0"
 			}
 			if addr.ListenPort != 0 {
 				inMap["listen_port"] = addr.ListenPort
 			}
+		} else {
+			// Defaults
+			if _, ok := inMap["listen"]; !ok {
+				inMap["listen"] = "0.0.0.0"
+			}
+			if _, ok := inMap["listen_port"]; !ok {
+				inMap["listen_port"] = 2053
+			}
 		}
-		// Apply TLS if present
+
+		// Merge TLS config from db.TLS
 		if in.TlsId > 0 && in.Tls != nil && in.Tls.Server != nil {
 			var tlsCfg map[string]interface{}
 			json.Unmarshal(in.Tls.Server, &tlsCfg)
-			if tlsCfg != nil {
+			if tlsCfg != nil && len(tlsCfg) > 0 {
 				inMap["tls"] = tlsCfg
 			}
 		}
+
 		jb, _ := json.Marshal(inMap)
 		inbounds = append(inbounds, json.RawMessage(jb))
 	}
 
-	// Build outbounds: direct + block + dns
+	// Build outbounds: use db.Outbound.Options (raw sing-box JSON)
 	outbounds := []json.RawMessage{
 		json.RawMessage(`{"type":"direct","tag":"direct"}`),
 		json.RawMessage(`{"type":"block","tag":"block"}`),
-		json.RawMessage(`{"type":"direct","tag":"dns"}`),
 	}
 
-	// Add WARP endpoints if any
+	for _, out := range cfg.Outbounds {
+		if len(out.Options) > 0 {
+			outbounds = append(outbounds, out.Options)
+		}
+	}
+
+	// Add WARP endpoints
 	for _, ep := range cfg.Endpoints {
 		if len(ep.Options) > 0 {
 			outbounds = append(outbounds, ep.Options)
 		}
 	}
 
+	// Build root config
 	root := map[string]interface{}{
 		"log": map[string]interface{}{
 			"level": level,
+			"timestamp": true,
 		},
 		"inbounds":  inbounds,
 		"outbounds": outbounds,
