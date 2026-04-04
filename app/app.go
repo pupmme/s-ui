@@ -12,14 +12,30 @@ import (
 	"github.com/pupmme/sub/web"
 )
 
+var (
+	configPath = "/etc/sub/config.json"
+	dataPath   = "/etc/sub/singbox.json"
+)
+
 func Start() error {
+	return startWithPaths(configPath, dataPath)
+}
+
+func StartWithPaths(cfgPath, dPath string) error {
+	configPath = cfgPath
+	dataPath = dPath
+	return startWithPaths(configPath, dataPath)
+}
+
+func startWithPaths(cfgPath, dPath string) error {
 	logger.InitLogger()
 	logger.Info("sub starting...")
 
+	config.SetPath(cfgPath)
 	if err := config.Load(); err != nil {
 		logger.Error("load config: ", err)
 	}
-	if err := db.Load("/etc/sub/singbox.json"); err != nil {
+	if err := db.Load(dPath); err != nil {
 		logger.Error("load db: ", err)
 	}
 
@@ -28,7 +44,11 @@ func Start() error {
 		logger.Error("start core: ", err)
 	}
 
-	go web.NewServer()
+	webServer := web.NewServer()
+	if err := webServer.Start(); err != nil {
+		logger.Error("start web server: ", err)
+		return err
+	}
 
 	logger.Info("sub is running. PID: ", os.Getpid())
 	ch := make(chan os.Signal, 1)
@@ -36,5 +56,7 @@ func Start() error {
 	<-ch
 
 	logger.Info("shutting down...")
+	coreSvc.Close()
+	webServer.Stop()
 	return nil
 }

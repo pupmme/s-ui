@@ -26,7 +26,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-//go:embed *
+//go:embed dist
 var content embed.FS
 
 type Server struct {
@@ -58,7 +58,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 
 	// Load the HTML template
 	t := template.New("").Funcs(engine.FuncMap)
-	template, err := t.ParseFS(content, "html/index.html")
+	template, err := t.ParseFS(content, "dist/index.html")
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	}
 
 	engine.Use(gzip.Gzip(gzip.DefaultCompression))
-	assetsBasePath := base_url + "assets/"
+	assetsBasePath := "/assets/"
 
 	store := cookie.NewStore(secret)
 	engine.Use(sessions.Sessions("s-ui", store))
@@ -97,7 +97,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	})
 
 	// Serve the assets folder
-	assetsFS, err := fs.Sub(content, "html/assets")
+	assetsFS, err := fs.Sub(content, "dist/assets")
 	if err != nil {
 		panic(err)
 	}
@@ -108,6 +108,11 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 
 	group_api := engine.Group(base_url + "api")
 	api.NewAPIHandler(group_api)
+
+	// Health check endpoint
+	engine.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	// Serve index.html as the entry point
 	// Handle all other routes by serving index.html
@@ -182,9 +187,9 @@ func (s *Server) Start() (err error) {
 	}
 
 	if certFile != "" || keyFile != "" {
-		logger.Info("web server run https on", listener.Addr())
+		logger.Info("web server started on", listener.Addr(), " (https)")
 	} else {
-		logger.Info("web server run http on", listener.Addr())
+		logger.Info("web server started on", listener.Addr(), " (http)")
 	}
 	s.listener = listener
 
