@@ -2,8 +2,11 @@ package api
 
 import (
 	"encoding/json"
+	"io"
+	"strings"
 	"time"
 
+	"github.com/pupmme/sub/config"
 	"github.com/pupmme/sub/logger"
 	"github.com/pupmme/sub/service"
 	"github.com/pupmme/sub/util/common"
@@ -40,23 +43,83 @@ func (a *ApiService) getData(c *gin.Context) (map[string]interface{}, error) {
 }
 
 func (a *ApiService) Login(c *gin.Context) {
-	username := c.Request.FormValue("username")
-	password := c.Request.FormValue("password")
 	remoteIP := c.ClientIP()
 
+	// Log raw request body for debugging
+	bodyBytes, _ := io.ReadAll(c.Request.Body)
+	logger.Infof("LOGIN raw_body: %s", string(bodyBytes))
+	logger.Infof("LOGIN content_type: %s", c.ContentType())
+	logger.Infof("LOGIN form_user: %s form_pass: %s",
+		c.Request.FormValue("username"), c.Request.FormValue("password"))
+
+	var username, password string
+
+	// Try JSON body
+	if len(bodyBytes) > 0 {
+		var req struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+			User     string `json:"user"`
+			Pass     string `json:"pass"`
+		}
+		if err := json.Unmarshal(bodyBytes, &req); err == nil {
+			logger.Infof("LOGIN json parsed: username=%q pass=%q user=%q pass=%q",
+				req.Username, req.Password, req.User, req.Pass)
+			if req.Username != "" {
+				username = req.Username
+				password = req.Password
+			} else if req.User != "" {
+				username = req.User
+				password = req.Pass
+			}
+		} else {
+			logger.Infof("LOGIN json unmarshal err: %v", err)
+		}
+	}
+
+	// Fall back to form values
+	if username == "" {
+		username = c.Request.FormValue("username")
+		password = c.Request.FormValue("password")
+	}
+
+	username = strings.TrimSpace(username)
+	password = strings.TrimSpace(password)
+
+	logger.Infof("LOGIN final: user=%q pass=%q", username, password)
+
 	if username == "" || password == "" {
+		logger.Warning("login: empty field, user=%q pass=%q", username, password)
 		jsonMsg(c, "login", common.NewError("username or password is empty"))
 		return
 	}
 
-	_, err := a.UserService.Login(username, password, remoteIP)
-	if err != nil {
-		logger.Warning("login failed: ", err, " IP: ", remoteIP)
+	// Authenticate against config.json web.password
+	var success bool
+	webCfg := config.Get().Web
+	logger.Infof("LOGIN cfg: cfg_user=%q cfg_pass=%q", webCfg.Username, webCfg.Password)
+
+	if username == webCfg.Username && password == webCfg.Password {
+		logger.Info("LOGIN success via config.json")
+		success = true
+	}
+
+	// Authenticate against db Users
+	if !success {
+		_, err := a.UserService.Login(username, password, remoteIP)
+		if err == nil {
+			logger.Info("LOGIN success via db")
+			success = true
+		} else {
+			logger.Warning("login failed: ", err, " IP: ", remoteIP)
+		}
+	}
+
+	if !success {
 		jsonMsg(c, "login", common.NewError("wrong user or password!"))
 		return
 	}
 
-	// Save session so the user is considered logged in
 	SetLoginUser(c, username, 0)
 	c.JSON(200, gin.H{"status": "success"})
 }
