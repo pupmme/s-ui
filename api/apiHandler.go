@@ -60,7 +60,7 @@ func (a *APIHandler) getHandler(c *gin.Context) {
 	switch action {
 	case "getConfig":
 		a.ApiService.GetSingboxConfig(c)
-	case "loadData":
+	case "load", "loadData":
 		a.ApiService.LoadData(c)
 	default:
 		fmt.Println("unknown action: " + action)

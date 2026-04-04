@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"strings"
-	"time"
 
 	"github.com/pupmme/sub/config"
 	"github.com/pupmme/sub/logger"
@@ -22,6 +21,7 @@ type ApiService struct {
 	service.OutboundService
 	service.EndpointService
 	service.ServicesService
+	service.StatsService
 	service.PanelService
 	service.ServerService
 }
@@ -36,19 +36,71 @@ func (a *ApiService) LoadData(c *gin.Context) {
 }
 
 func (a *ApiService) getData(c *gin.Context) (map[string]interface{}, error) {
-	data := make(map[string]interface{})
-	data["status"] = "ok"
+	data := make(map[string]interface{}, 0)
+
+	onlines, _ := a.StatsService.GetOnlines()
+	data["onlines"] = onlines
+
+	sysInfo := a.ServerService.GetSingboxInfo()
+	if sysInfo["running"] == false {
+		logs := a.ServerService.GetLogs("1", "debug")
+		if len(logs) > 0 {
+			data["lastLog"] = logs[0]
+		}
+	}
+
+	// Load all objects
+	clients, err := a.ClientService.GetAll()
+	if err != nil {
+		logger.Warning("getData: GetAll clients err:", err)
+	} else {
+		data["clients"] = clients
+	}
+
+	tlsConfigs, err := a.TlsService.GetAll()
+	if err != nil {
+		logger.Warning("getData: GetAll tls err:", err)
+	} else {
+		data["tls"] = tlsConfigs
+	}
+
+	inbounds, err := a.InboundService.GetAll()
+	if err != nil {
+		logger.Warning("getData: GetAll inbounds err:", err)
+	} else {
+		data["inbounds"] = inbounds
+	}
+
+	outbounds, err := a.OutboundService.GetAll()
+	if err != nil {
+		logger.Warning("getData: GetAll outbounds err:", err)
+	} else {
+		data["outbounds"] = outbounds
+	}
+
+	endpoints, err := a.EndpointService.GetAll()
+	if err != nil {
+		logger.Warning("getData: GetAll endpoints err:", err)
+	} else {
+		data["endpoints"] = endpoints
+	}
+
+	services, err := a.ServicesService.GetAll()
+	if err != nil {
+		logger.Warning("getData: GetAll services err:", err)
+	} else {
+		data["services"] = services
+	}
+
 	return data, nil
 }
 
 func (a *ApiService) Login(c *gin.Context) {
 	remoteIP := c.ClientIP()
 
-	var username, password string
-
-	// Gin session middleware now scoped to base group only; API body is intact
-	username = c.PostForm("user")
-	password = c.PostForm("pass")
+	ct := c.ContentType()
+	username := c.PostForm("user")
+	password := c.PostForm("pass")
 	if username == "" {
 		username = c.PostForm("username")
 		password = c.PostForm("password")
@@ -56,14 +108,13 @@ func (a *ApiService) Login(c *gin.Context) {
 
 	username = strings.TrimSpace(username)
 	password = strings.TrimSpace(password)
-	logger.Infof("LOGIN final: user=%q pass=%q", username, password)
+	logger.Infof("LOGIN: ct=%q user=%q pass=%q", ct, username, password)
 
 	if username == "" || password == "" {
 		jsonMsg(c, "login", common.NewError("username or password is empty"))
 		return
 	}
 
-	// Authenticate: config.json web.password
 	success := false
 	if cfg := config.Get(); cfg != nil && cfg.Web.Username != "" {
 		if username == cfg.Web.Username && password == cfg.Web.Password {
@@ -72,7 +123,6 @@ func (a *ApiService) Login(c *gin.Context) {
 		}
 	}
 
-	// Authenticate: db Users
 	if !success {
 		_, err := a.UserService.Login(username, password, remoteIP)
 		if err == nil {
@@ -83,7 +133,6 @@ func (a *ApiService) Login(c *gin.Context) {
 		}
 	}
 
-	// Default password fallback
 	if !success && username == "admin" && password == "admin123" {
 		logger.Info("LOGIN: matched default")
 		success = true
@@ -136,7 +185,5 @@ func (a *ApiService) GetSingboxConfig(c *gin.Context) {
 		c.Writer.WriteString(err.Error())
 		return
 	}
-	c.Header("Content-Type", "application/json")
-	c.Header("Content-Disposition", "attachment; filename=config_"+time.Now().Format("20060102-150405")+".json")
-	c.Writer.Write(rawConfig)
+	c.JSON(200, gin.H{"status": "ok", "obj": rawConfig})
 }
