@@ -1,180 +1,254 @@
 #!/bin/bash
+set -e
+
+# =============================================
+# pupmme/s-ui 安装脚本
+# =============================================
 
 red='\033[0;31m'
 green='\033[0;32m'
 yellow='\033[0;33m'
+blue='\033[0;34m'
 plain='\033[0m'
 
-cur_dir=$(pwd)
+NAME="s-ui"
+BINARY_NAME="sui"
+BIN_DIR="/usr/local/${NAME}"
+CFG_DIR="/etc/sub"
+BIN_PATH="${BIN_DIR}/${BINARY_NAME}"
+CMD_PATH="/usr/bin/${BINARY_NAME}"
+SERVICE_NAME="s-ui"
+SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}.service"
+
+GIT_RAW="https://raw.githubusercontent.com/pupmme/s-ui"
+REPO_API="https://api.github.com/repos/pupmme/s-ui/releases"
+
+error()   { echo -e "${red}[错误]${plain} $*"; }
+info()    { echo -e "${blue}[信息]${plain} $*"; }
+success() { echo -e "${green}[成功]${plain} $*"; }
+warn()    { echo -e "${yellow}[警告]${plain} $*"; }
 
 # check root
-[[ $EUID -ne 0 ]] && echo -e "${red}Fatal error: ${plain} Please run this script with root privilege \n " && exit 1
-
-# Check OS and set release variable
-if [[ -f /etc/os-release ]]; then
-    source /etc/os-release
-    release=$ID
-elif [[ -f /usr/lib/os-release ]]; then
-    source /usr/lib/os-release
-    release=$ID
-else
-    echo "Failed to check the system OS, please contact the author!" >&2
+if [[ $EUID -ne 0 ]]; then
+    error "必须使用 root 用户运行此脚本"
     exit 1
 fi
-echo "The OS release is: $release"
 
-arch() {
+arch_detect() {
     case "$(uname -m)" in
-    x86_64 | x64 | amd64) echo 'amd64' ;;
-    i*86 | x86) echo '386' ;;
-    armv8* | armv8 | arm64 | aarch64) echo 'arm64' ;;
-    armv7* | armv7 | arm) echo 'armv7' ;;
-    armv6* | armv6) echo 'armv6' ;;
-    armv5* | armv5) echo 'armv5' ;;
-    s390x) echo 's390x' ;;
-    *) echo -e "${green}Unsupported CPU architecture! ${plain}" && rm -f install.sh && exit 1 ;;
+    x86_64|x64|amd64)   echo 'amd64' ;;
+    aarch64|arm64)      echo 'arm64' ;;
+    armv7l)             echo 'armv7' ;;
+    *)                  echo 'amd64' ;;
     esac
 }
 
-echo "arch: $(arch)"
-
-install_base() {
-    case "${release}" in
-    centos | almalinux | rocky | oracle)
-        yum -y update && yum install -y -q wget curl tar tzdata
-        ;;
-    fedora)
-        dnf -y update && dnf install -y -q wget curl tar tzdata
-        ;;
-    arch | manjaro | parch)
-        pacman -Syu && pacman -Syu --noconfirm wget curl tar tzdata
-        ;;
-    opensuse-tumbleweed)
-        zypper refresh && zypper -q install -y wget curl tar timezone
-        ;;
-    *)
-        apt-get update && apt-get install -y -q wget curl tar tzdata
-        ;;
-    esac
-}
-
-config_after_install() {
-    echo -e "${yellow}Migration... ${plain}"
-    /usr/local/s-ui/sui migrate
-    
-    echo -e "${yellow}Install/update finished! For security it's recommended to modify panel settings ${plain}"
-    read -p "Do you want to continue with the modification [y/n]? ": config_confirm
-    if [[ "${config_confirm}" == "y" || "${config_confirm}" == "Y" ]]; then
-        echo -e "Enter the ${yellow}panel port${plain} (leave blank for existing/default value):"
-        read config_port
-        echo -e "Enter the ${yellow}panel path${plain} (leave blank for existing/default value):"
-        read config_path
-
-        # Set configs
-        echo -e "${yellow}Initializing, please wait...${plain}"
-        params=""
-        [ -z "$config_port" ] || params="$params -port $config_port"
-        [ -z "$config_path" ] || params="$params -path $config_path"
-        /usr/local/s-ui/sui setting ${params}
-
-        read -p "Do you want to change admin credentials [y/n]? ": admin_confirm
-        if [[ "${admin_confirm}" == "y" || "${admin_confirm}" == "Y" ]]; then
-            # First admin credentials
-            read -p "Please set up your username:" config_account
-            read -p "Please set up your password:" config_password
-
-            # Set credentials
-            echo -e "${yellow}Initializing, please wait...${plain}"
-            /usr/local/s-ui/sui admin -username ${config_account} -password ${config_password}
-        else
-            echo -e "${yellow}Your current admin credentials: ${plain}"
-            /usr/local/s-ui/sui admin -show
-        fi
-    else
-        echo -e "${red}cancel...${plain}"
-        if [[ ! -f "/usr/local/s-ui/db/s-ui.db" ]]; then
-            local usernameTemp=$(head -c 6 /dev/urandom | base64)
-            local passwordTemp=$(head -c 6 /dev/urandom | base64)
-            echo -e "this is a fresh installation,will generate random login info for security concerns:"
-            echo -e "###############################################"
-            echo -e "${green}username:${usernameTemp}${plain}"
-            echo -e "${green}password:${passwordTemp}${plain}"
-            echo -e "###############################################"
-            echo -e "${red}if you forgot your login info,you can type ${green}s-ui${red} for configuration menu${plain}"
-            /usr/local/s-ui/sui admin -username ${usernameTemp} -password ${passwordTemp}
-        else
-            echo -e "${red} this is your upgrade,will keep old settings,if you forgot your login info,you can type ${green}s-ui${red} for configuration menu${plain}"
-        fi
+systemd_reload() {
+    if systemctl is-active --quiet ${SERVICE_NAME}; then
+        systemctl stop ${SERVICE_NAME} 2>/dev/null || true
     fi
-}
-
-prepare_services() {
-    if [[ -f "/etc/systemd/system/sing-box.service" ]]; then
-        echo -e "${yellow}Stopping sing-box service... ${plain}"
-        systemctl stop sing-box
-        rm -f /usr/local/s-ui/bin/sing-box /usr/local/s-ui/bin/runSingbox.sh /usr/local/s-ui/bin/signal
-    fi
-    if [[ -e "/usr/local/s-ui/bin" ]]; then
-        echo -e "###############################################################"
-        echo -e "${green}/usr/local/s-ui/bin${red} directory exists yet!"
-        echo -e "Please check the content and delete it manually after migration ${plain}"
-        echo -e "###############################################################"
+    if systemctl is-enabled --quiet ${SERVICE_NAME} 2>/dev/null; then
+        systemctl disable ${SERVICE_NAME} 2>/dev/null || true
     fi
     systemctl daemon-reload
 }
 
-install_s-ui() {
-    cd /tmp/
+uninstall_old() {
+    # 清理旧版 pupmsub / sub 安装
+    if [[ -f /etc/systemd/system/sub.service ]] || [[ -f /etc/systemd/system/sing-box.service ]]; then
+        warn "检测到旧版安装，正在清理..."
+        systemd_reload 2>/dev/null || true
+        rm -f /etc/systemd/system/sub.service
+        rm -f /etc/systemd/system/sing-box.service
+        rm -rf /usr/local/sub/
+        rm -f /usr/bin/sub
+        info "旧版清理完成"
+    fi
+    # 清理本工具旧安装
+    if [[ -d "${BIN_DIR}" ]] || [[ -f "${CMD_PATH}" ]]; then
+        warn "检测到本工具旧版安装，正在卸载..."
+        systemd_reload
+        rm -rf "${BIN_DIR}"
+        rm -f "${CMD_PATH}"
+        info "旧版卸载完成"
+    fi
+}
 
-    if [ $# == 0 ]; then
-        last_version=$(curl -Ls "https://api.github.com/repos/pupmme/s-ui/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-        if [[ ! -n "$last_version" ]]; then
-            echo -e "${red}Failed to fetch s-ui version, it maybe due to Github API restrictions, please try it later${plain}"
-            exit 1
-        fi
-        echo -e "Got s-ui latest version: ${last_version}, beginning the installation..."
-        wget -N --no-check-certificate -O /tmp/s-ui-linux-$(arch).tar.gz https://github.com/pupmme/s-ui/releases/download/${last_version}/s-ui-linux-$(arch).tar.gz
-        if [[ $? -ne 0 ]]; then
-            echo -e "${red}Downloading s-ui failed, please be sure that your server can access Github ${plain}"
+install_base() {
+    info "安装基础依赖..."
+    if command -v apt-get &>/dev/null; then
+        apt-get update -qq && apt-get install -y -qq wget curl tar tzdata > /dev/null 2>&1
+    elif command -v yum &>/dev/null; then
+        yum install -y -q wget curl tar > /dev/null 2>&1
+    elif command -v dnf &>/dev/null; then
+        dnf install -y -q wget curl tar > /dev/null 2>&1
+    fi
+    success "基础依赖安装完成"
+}
+
+write_systemd() {
+    cat > "${SERVICE_PATH}" << EOF
+[Unit]
+Description=pupmme s-ui panel
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+ExecStart=${BIN_PATH}
+Restart=on-failure
+RestartSec=5s
+StateDirectory=sub
+StateDirectoryMode=0755
+PermissionsStartOnly=true
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    success "systemd service 已写入"
+}
+
+write_default_config() {
+    mkdir -p "${CFG_DIR}"
+    if [[ ! -f "${CFG_DIR}/config.json" ]]; then
+        cat > "${CFG_DIR}/config.json" << EOF
+{
+  "log": {
+    "level": "info",
+    "output": ""
+  },
+  "web": {
+    "port": 2053,
+    "cert": "",
+    "key": "",
+    "username": "admin",
+    "password": "$(head -c 12 /dev/urandom | base64)"
+  },
+  "node": false,
+  "xboard": {
+    "apiHost": "",
+    "apiKey": "",
+    "nodeId": 0,
+    "nodeType": "",
+    "timeout": 30,
+    "listenIP": "0.0.0.0",
+    "sendIP": "0.0.0.0",
+    "tcpFastOpen": false,
+    "sniffEnabled": false,
+    "inboundConfig": {
+      "protocol_options": {
+        "heartbeat_interval": "3s",
+        "idle_timeout": "300s"
+      }
+    },
+    "certConfig": {
+      "certMode": "dns",
+      "certFile": "",
+      "keyFile": "",
+      "provider": "cloudflare",
+      "dnsEnv": {}
+    }
+  }
+}
+EOF
+        success "配置文件已写入 (${CFG_DIR}/config.json)"
+    fi
+}
+
+fetch_binary() {
+    local arch=$(arch_detect)
+    local tmp_dir=$(mktemp -d)
+    local tmp_tar="${tmp_dir}/s-ui.tar.gz"
+
+    info "下载 s-ui ${arch} ..."
+
+    if [[ $# -eq 0 ]]; then
+        local latest=$(curl -sL "${REPO_API}/latest" | grep -oP '"tag_name":\s*"\K[^"]+')
+        if [[ -z "${latest}" ]]; then
+            error "无法获取最新版本，请检查网络连接"
+            rm -rf "${tmp_dir}"
             exit 1
         fi
     else
-        last_version=$1
-        url="https://github.com/pupmme/s-ui/releases/download/${last_version}/s-ui-linux-$(arch).tar.gz"
-        echo -e "Beginning the install s-ui v$1"
-        wget -N --no-check-certificate -O /tmp/s-ui-linux-$(arch).tar.gz ${url}
-        if [[ $? -ne 0 ]]; then
-            echo -e "${red}download s-ui v$1 failed,please check the version exists${plain}"
-            exit 1
-        fi
+        local latest=$1
     fi
 
-    if [[ -e /usr/local/s-ui/ ]]; then
-        systemctl stop s-ui
+    info "版本: ${latest}"
+
+    local url="${REPO_API}/download/${latest}/s-ui-linux-${arch}.tar.gz"
+    wget -q -O "${tmp_tar}" "${url}"
+    if [[ $? -ne 0 ]]; then
+        error "下载失败: ${url}"
+        rm -rf "${tmp_dir}"
+        exit 1
     fi
 
-    tar zxvf s-ui-linux-$(arch).tar.gz
-    rm s-ui-linux-$(arch).tar.gz -f
+    tar -xzf "${tmp_tar}" -C "${tmp_dir}"
+    local extracted_dir=$(ls "${tmp_dir}" | grep -v 'tar.gz' | head -1)
+    if [[ -z "${extracted_dir}" ]]; then
+        error "解压失败"
+        rm -rf "${tmp_dir}"
+        exit 1
+    fi
 
-    chmod +x s-ui/sui s-ui/s-ui.sh
-    cp s-ui/s-ui.sh /usr/bin/s-ui
-    cp -rf s-ui /usr/local/
-    cp -f s-ui/*.service /etc/systemd/system/
-    rm -rf s-ui
+    mkdir -p "${BIN_DIR}"
+    cp "${tmp_dir}/${extracted_dir}/sui" "${BIN_PATH}"
+    chmod +x "${BIN_PATH}"
+    cp "${tmp_dir}/${extracted_dir}/s-ui.sh" "${BIN_DIR}/"
+    chmod +x "${BIN_DIR}/s-ui.sh"
+    ln -sf "${BIN_DIR}/s-ui.sh" "${CMD_PATH}"
 
-    config_after_install
-    prepare_services
+    # 清理
+    rm -rf "${tmp_dir}"
 
-    systemctl enable s-ui --now
-
-    echo -e "${green}s-ui v${last_version}${plain} installation finished, it is up and running now..."
-    echo -e "You may access the Panel with following URL(s):${green}"
-    /usr/local/s-ui/sui uri
-    echo -e "${plain}"
-    echo -e ""
-    s-ui help
+    success "二进制安装完成 (${BIN_PATH})"
 }
 
-echo -e "${green}Executing...${plain}"
-install_base
-install_s-ui $1
+enable_start() {
+    systemctl daemon-reload
+    systemctl enable ${SERVICE_NAME} --now
+    sleep 1
+
+    if systemctl is-active --quiet ${SERVICE_NAME}; then
+        success "s-ui 服务已启动"
+    else
+        error "服务启动失败，请查看 journalctl -u ${SERVICE_NAME} -n 20"
+        exit 1
+    fi
+}
+
+show_info() {
+    echo ""
+    echo "============================================"
+    success "s-ui 安装完成！"
+    echo "============================================"
+    echo ""
+    echo "管理命令: ${CMD_PATH}"
+    echo ""
+    ${CMD_PATH} admin -show 2>/dev/null || true
+    echo ""
+    echo "systemd:  systemctl ${SERVICE_NAME} status|start|stop|restart"
+    echo "日志:     journalctl -u ${SERVICE_NAME} -f"
+    echo ""
+}
+
+# =============================================
+# 主流程
+# =============================================
+main() {
+    echo -e "${green}============================================"
+    echo -e "  pupmme/s-ui 安装脚本"
+    echo -e "============================================${plain}"
+    echo ""
+
+    install_base
+    uninstall_old
+    write_default_config
+    fetch_binary "$@"
+    write_systemd
+    enable_start
+    show_info
+}
+
+main "$@"
