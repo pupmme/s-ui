@@ -12,3 +12,7 @@ vendor/
 .env
 .DS_Store
 Thumbs.db
+dist/
+sui
+s-ui
+.DS_Store

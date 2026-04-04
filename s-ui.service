@@ -1,14 +1,16 @@
 [Unit]
-Description=s-ui Service
+Description=pupmme sub panel
 After=network.target
-Wants=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/usr/local/s-ui/
-ExecStart=/usr/local/s-ui/sui
+ExecStart=/usr/local/bin/sui
 Restart=on-failure
-RestartSec=10s
+RestartSec=5s
+StateDirectory=sub
+StateDirectoryMode=0755
+# 面板端口（默认 2053）
+EnvironmentFile=-/etc/sub/config.env
 
 [Install]
 WantedBy=multi-user.target
