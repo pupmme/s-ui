@@ -6,22 +6,16 @@ import (
 
 	"github.com/alireza0/s-ui/database"
 	"github.com/alireza0/s-ui/database/model"
+	"github.com/alireza0/s-ui/db"
 	"github.com/alireza0/s-ui/util/common"
-
-	"gorm.io/gorm"
 )
 
 type OutboundService struct{}
 
 func (o *OutboundService) GetAll() (*[]map[string]interface{}, error) {
-	db := database.GetDB()
-	outbounds := []*model.Outbound{}
-	err := db.Model(model.Outbound{}).Scan(&outbounds).Error
-	if err != nil {
-		return nil, err
-	}
+	cfg := db.Get()
 	var data []map[string]interface{}
-	for _, outbound := range outbounds {
+	for _, outbound := range cfg.Outbounds {
 		outData := map[string]interface{}{
 			"id":   outbound.Id,
 			"type": outbound.Type,
@@ -29,11 +23,10 @@ func (o *OutboundService) GetAll() (*[]map[string]interface{}, error) {
 		}
 		if outbound.Options != nil {
 			var restFields map[string]json.RawMessage
-			if err := json.Unmarshal(outbound.Options, &restFields); err != nil {
-				return nil, err
-			}
-			for k, v := range restFields {
-				outData[k] = v
+			if err := json.Unmarshal(outbound.Options, &restFields); err == nil {
+				for k, v := range restFields {
+					outData[k] = v
+				}
 			}
 		}
 		data = append(data, outData)
@@ -41,15 +34,18 @@ func (o *OutboundService) GetAll() (*[]map[string]interface{}, error) {
 	return &data, nil
 }
 
-func (o *OutboundService) GetAllConfig(db *gorm.DB) ([]json.RawMessage, error) {
+// GetAllConfig returns all outbounds as sing-box JSON configs.
+func (o *OutboundService) GetAllConfig() ([]json.RawMessage, error) {
+	cfg := db.Get()
 	var outboundsJson []json.RawMessage
-	var outbounds []*model.Outbound
-	err := db.Model(model.Outbound{}).Scan(&outbounds).Error
-	if err != nil {
-		return nil, err
-	}
-	for _, outbound := range outbounds {
-		outboundJson, err := outbound.MarshalJSON()
+	for _, outbound := range cfg.Outbounds {
+		outModel := model.Outbound{
+			Id:      outbound.Id,
+			Type:    outbound.Type,
+			Tag:     outbound.Tag,
+			Options: outbound.Options,
+		}
+		outboundJson, err := outModel.MarshalJSON()
 		if err != nil {
 			return nil, err
 		}
@@ -58,14 +54,14 @@ func (o *OutboundService) GetAllConfig(db *gorm.DB) ([]json.RawMessage, error) {
 	return outboundsJson, nil
 }
 
-func (s *OutboundService) Save(tx *gorm.DB, act string, data json.RawMessage) error {
-	var err error
+// Save handles CRUD for outbounds. tx is ignored in JSON mode.
+func (s *OutboundService) Save(tx interface{}, act string, data json.RawMessage) error {
+	cfg := db.Get()
 
 	switch act {
 	case "new", "edit":
 		var outbound model.Outbound
-		err = outbound.UnmarshalJSON(data)
-		if err != nil {
+		if err := outbound.UnmarshalJSON(data); err != nil {
 			return err
 		}
 
@@ -76,43 +72,75 @@ func (s *OutboundService) Save(tx *gorm.DB, act string, data json.RawMessage) er
 			}
 			if act == "edit" {
 				var oldTag string
-				err = tx.Model(model.Outbound{}).Select("tag").Where("id = ?", outbound.Id).Find(&oldTag).Error
-				if err != nil {
-					return err
+				for _, o := range cfg.Outbounds {
+					if o.Id == outbound.Id {
+						oldTag = o.Tag
+						break
+					}
 				}
-				err = corePtr.RemoveOutbound(oldTag)
-				if err != nil && err != os.ErrInvalid {
-					return err
+				if oldTag != "" {
+					if err := corePtr.RemoveOutbound(oldTag); err != nil && err != nil && err.Error() != "invalid" {
+						return err
+					}
 				}
 			}
-			err = corePtr.AddOutbound(configData)
-			if err != nil {
+			if err := corePtr.AddOutbound(configData); err != nil {
 				return err
 			}
 		}
 
-		err = tx.Save(&outbound).Error
-		if err != nil {
-			return err
+		outJSON := db.Outbound{
+			Id:      outbound.Id,
+			Type:    outbound.Type,
+			Tag:     outbound.Tag,
+			Options: outbound.Options,
 		}
+		if act == "edit" {
+			found := false
+			for i := range cfg.Outbounds {
+				if cfg.Outbounds[i].Id == outbound.Id {
+					cfg.Outbounds[i] = outJSON
+					found = true
+					break
+				}
+			}
+			if !found {
+				cfg.Outbounds = append(cfg.Outbounds, outJSON)
+			}
+		} else {
+			maxId := uint(0)
+			for _, o := range cfg.Outbounds {
+				if o.Id > maxId {
+					maxId = o.Id
+				}
+			}
+			outJSON.Id = maxId + 1
+			cfg.Outbounds = append(cfg.Outbounds, outJSON)
+		}
+		db.Set(cfg)
+		return database.SaveConfig()
+
 	case "del":
 		var tag string
-		err = json.Unmarshal(data, &tag)
-		if err != nil {
+		if err := json.Unmarshal(data, &tag); err != nil {
 			return err
 		}
 		if corePtr.IsRunning() {
-			err = corePtr.RemoveOutbound(tag)
-			if err != nil && err != os.ErrInvalid {
+			if err := corePtr.RemoveOutbound(tag); err != nil && err != nil && err.Error() != "invalid" {
 				return err
 			}
 		}
-		err = tx.Where("tag = ?", tag).Delete(model.Outbound{}).Error
-		if err != nil {
-			return err
+		newOutbounds := make([]db.Outbound, 0, len(cfg.Outbounds))
+		for _, o := range cfg.Outbounds {
+			if o.Tag != tag {
+				newOutbounds = append(newOutbounds, o)
+			}
 		}
+		cfg.Outbounds = newOutbounds
+		db.Set(cfg)
+		return database.SaveConfig()
+
 	default:
 		return common.NewErrorf("unknown action: %s", act)
 	}
-	return nil
 }

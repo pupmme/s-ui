@@ -2,13 +2,11 @@ package service
 
 import (
 	"encoding/json"
-	"os"
 
 	"github.com/alireza0/s-ui/database"
 	"github.com/alireza0/s-ui/database/model"
+	"github.com/alireza0/s-ui/db"
 	"github.com/alireza0/s-ui/util/common"
-
-	"gorm.io/gorm"
 )
 
 type EndpointService struct {
@@ -16,14 +14,9 @@ type EndpointService struct {
 }
 
 func (o *EndpointService) GetAll() (*[]map[string]interface{}, error) {
-	db := database.GetDB()
-	endpoints := []*model.Endpoint{}
-	err := db.Model(model.Endpoint{}).Scan(&endpoints).Error
-	if err != nil {
-		return nil, err
-	}
+	cfg := db.Get()
 	var data []map[string]interface{}
-	for _, endpoint := range endpoints {
+	for _, endpoint := range cfg.Endpoints {
 		epData := map[string]interface{}{
 			"id":   endpoint.Id,
 			"type": endpoint.Type,
@@ -32,11 +25,10 @@ func (o *EndpointService) GetAll() (*[]map[string]interface{}, error) {
 		}
 		if endpoint.Options != nil {
 			var restFields map[string]json.RawMessage
-			if err := json.Unmarshal(endpoint.Options, &restFields); err != nil {
-				return nil, err
-			}
-			for k, v := range restFields {
-				epData[k] = v
+			if err := json.Unmarshal(endpoint.Options, &restFields); err == nil {
+				for k, v := range restFields {
+					epData[k] = v
+				}
 			}
 		}
 		data = append(data, epData)
@@ -44,15 +36,19 @@ func (o *EndpointService) GetAll() (*[]map[string]interface{}, error) {
 	return &data, nil
 }
 
-func (o *EndpointService) GetAllConfig(db *gorm.DB) ([]json.RawMessage, error) {
+// GetAllConfig returns all endpoints as sing-box JSON configs.
+func (o *EndpointService) GetAllConfig() ([]json.RawMessage, error) {
+	cfg := db.Get()
 	var endpointsJson []json.RawMessage
-	var endpoints []*model.Endpoint
-	err := db.Model(model.Endpoint{}).Scan(&endpoints).Error
-	if err != nil {
-		return nil, err
-	}
-	for _, endpoint := range endpoints {
-		endpointJson, err := endpoint.MarshalJSON()
+	for _, endpoint := range cfg.Endpoints {
+		epModel := model.Endpoint{
+			Id:      endpoint.Id,
+			Type:    endpoint.Type,
+			Tag:     endpoint.Tag,
+			Options: endpoint.Options,
+			Ext:     endpoint.Ext,
+		}
+		endpointJson, err := epModel.MarshalJSON()
 		if err != nil {
 			return nil, err
 		}
@@ -61,31 +57,36 @@ func (o *EndpointService) GetAllConfig(db *gorm.DB) ([]json.RawMessage, error) {
 	return endpointsJson, nil
 }
 
-func (s *EndpointService) Save(tx *gorm.DB, act string, data json.RawMessage) error {
-	var err error
+// Save handles CRUD for endpoints. tx is ignored in JSON mode.
+func (s *EndpointService) Save(tx interface{}, act string, data json.RawMessage) error {
+	cfg := db.Get()
 
 	switch act {
 	case "new", "edit":
 		var endpoint model.Endpoint
-		err = endpoint.UnmarshalJSON(data)
-		if err != nil {
+		if err := endpoint.UnmarshalJSON(data); err != nil {
 			return err
 		}
 
 		if endpoint.Type == "warp" {
 			if act == "new" {
-				err = s.WarpService.RegisterWarp(&endpoint)
-				if err != nil {
+				if err := s.WarpService.RegisterWarp(&endpoint); err != nil {
 					return err
 				}
 			} else {
-				var old_license string
-				err = tx.Model(model.Endpoint{}).Select("json_extract(ext, '$.license_key')").Where("id = ?", endpoint.Id).Find(&old_license).Error
-				if err != nil {
-					return err
+				// Retrieve old license from existing endpoint
+				var oldLicense string
+				for _, ep := range cfg.Endpoints {
+					if ep.Id == endpoint.Id {
+						var extMap map[string]string
+						if ep.Ext != nil {
+							json.Unmarshal(ep.Ext, &extMap)
+							oldLicense = extMap["license_key"]
+						}
+						break
+					}
 				}
-				err = s.WarpService.SetWarpLicense(old_license, &endpoint)
-				if err != nil {
+				if err := s.WarpService.SetWarpLicense(oldLicense, &endpoint); err != nil {
 					return err
 				}
 			}
@@ -98,43 +99,76 @@ func (s *EndpointService) Save(tx *gorm.DB, act string, data json.RawMessage) er
 			}
 			if act == "edit" {
 				var oldTag string
-				err = tx.Model(model.Endpoint{}).Select("tag").Where("id = ?", endpoint.Id).Find(&oldTag).Error
-				if err != nil {
-					return err
+				for _, ep := range cfg.Endpoints {
+					if ep.Id == endpoint.Id {
+						oldTag = ep.Tag
+						break
+					}
 				}
-				err = corePtr.RemoveEndpoint(oldTag)
-				if err != nil && err != os.ErrInvalid {
-					return err
+				if oldTag != "" {
+					if err := corePtr.RemoveEndpoint(oldTag); err != nil && err != nil && err.Error() != "not found" {
+						return err
+					}
 				}
 			}
-			err = corePtr.AddEndpoint(configData)
-			if err != nil {
+			if err := corePtr.AddEndpoint(configData); err != nil {
 				return err
 			}
 		}
 
-		err = tx.Save(&endpoint).Error
-		if err != nil {
-			return err
+		epJSON := db.Endpoint{
+			Id:      endpoint.Id,
+			Type:    endpoint.Type,
+			Tag:     endpoint.Tag,
+			Options: endpoint.Options,
+			Ext:     endpoint.Ext,
 		}
+		if act == "edit" {
+			found := false
+			for i := range cfg.Endpoints {
+				if cfg.Endpoints[i].Id == endpoint.Id {
+					cfg.Endpoints[i] = epJSON
+					found = true
+					break
+				}
+			}
+			if !found {
+				cfg.Endpoints = append(cfg.Endpoints, epJSON)
+			}
+		} else {
+			maxId := uint(0)
+			for _, ep := range cfg.Endpoints {
+				if ep.Id > maxId {
+					maxId = ep.Id
+				}
+			}
+			epJSON.Id = maxId + 1
+			cfg.Endpoints = append(cfg.Endpoints, epJSON)
+		}
+		db.Set(cfg)
+		return database.SaveConfig()
+
 	case "del":
 		var tag string
-		err = json.Unmarshal(data, &tag)
-		if err != nil {
+		if err := json.Unmarshal(data, &tag); err != nil {
 			return err
 		}
 		if corePtr.IsRunning() {
-			err = corePtr.RemoveEndpoint(tag)
-			if err != nil && err != os.ErrInvalid {
+			if err := corePtr.RemoveEndpoint(tag); err != nil && err != nil && err.Error() != "not found" {
 				return err
 			}
 		}
-		err = tx.Where("tag = ?", tag).Delete(model.Endpoint{}).Error
-		if err != nil {
-			return err
+		newEndpoints := make([]db.Endpoint, 0, len(cfg.Endpoints))
+		for _, ep := range cfg.Endpoints {
+			if ep.Tag != tag {
+				newEndpoints = append(newEndpoints, ep)
+			}
 		}
+		cfg.Endpoints = newEndpoints
+		db.Set(cfg)
+		return database.SaveConfig()
+
 	default:
 		return common.NewErrorf("unknown action: %s", act)
 	}
-	return nil
 }

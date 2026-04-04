@@ -1,13 +1,13 @@
 package service
 
 import (
+	"encoding/json"
 	"sort"
 	"time"
 
 	"github.com/alireza0/s-ui/database"
 	"github.com/alireza0/s-ui/database/model"
-
-	"gorm.io/gorm"
+	"github.com/alireza0/s-ui/db"
 )
 
 type onlines struct {
@@ -18,8 +18,7 @@ type onlines struct {
 
 var onlineResources = &onlines{}
 
-type StatsService struct {
-}
+type StatsService struct{}
 
 func (s *StatsService) SaveStats(enableTraffic bool) error {
 	if corePtr == nil || !corePtr.IsRunning() {
@@ -44,28 +43,19 @@ func (s *StatsService) SaveStats(enableTraffic bool) error {
 		return nil
 	}
 
-	var err error
-	db := database.GetDB()
-	tx := db.Begin()
-	defer func() {
-		if err == nil {
-			tx.Commit()
-		} else {
-			tx.Rollback()
-		}
-	}()
-
+	// Update client traffic from stats
+	cfg := db.Get()
 	for _, stat := range *stats {
 		if stat.Resource == "user" {
-			if stat.Direction {
-				err = tx.Model(model.Client{}).Where("name = ?", stat.Tag).
-					UpdateColumn("up", gorm.Expr("up + ?", stat.Traffic)).Error
-			} else {
-				err = tx.Model(model.Client{}).Where("name = ?", stat.Tag).
-					UpdateColumn("down", gorm.Expr("down + ?", stat.Traffic)).Error
-			}
-			if err != nil {
-				return err
+			for i := range cfg.Clients {
+				if cfg.Clients[i].Name == stat.Tag {
+					if stat.Direction {
+						cfg.Clients[i].Up += stat.Traffic
+					} else {
+						cfg.Clients[i].Down += stat.Traffic
+					}
+					break
+				}
 			}
 		}
 		if stat.Direction {
@@ -79,36 +69,60 @@ func (s *StatsService) SaveStats(enableTraffic bool) error {
 			}
 		}
 	}
+	db.Set(cfg)
 
 	if !enableTraffic {
 		return nil
 	}
-	return tx.Create(&stats).Error
+
+	// Append new stats records
+	for _, stat := range *stats {
+		cfg := db.Get()
+		cfg.Stats = append(cfg.Stats, db.Stat{
+			DateTime:  stat.DateTime,
+			Resource:  stat.Resource,
+			Tag:       stat.Tag,
+			Direction: stat.Direction,
+			Traffic:   stat.Traffic,
+		})
+		db.Set(cfg)
+	}
+
+	return database.SaveConfig()
 }
 
 func (s *StatsService) GetStats(resource string, tag string, limit int) ([]model.Stats, error) {
-	var err error
-	var result []model.Stats
-
+	cfg := db.Get()
 	currentTime := time.Now().Unix()
 	timeDiff := currentTime - (int64(limit) * 3600)
 
-	db := database.GetDB()
+	var result []model.Stats
 	resources := []string{resource}
 	if resource == "endpoint" {
 		resources = []string{"inbound", "outbound"}
 	}
-	err = db.Model(model.Stats{}).Where("resource in ? AND tag = ? AND date_time > ?", resources, tag, timeDiff).Scan(&result).Error
-	if err != nil {
-		return nil, err
+	for _, stat := range cfg.Stats {
+		if stat.DateTime > timeDiff {
+			for _, r := range resources {
+				if stat.Resource == r && stat.Tag == tag {
+					result = append(result, model.Stats{
+						DateTime:  stat.DateTime,
+						Resource:  stat.Resource,
+						Tag:       stat.Tag,
+						Direction: stat.Direction,
+						Traffic:   stat.Traffic,
+					})
+					break
+				}
+			}
+		}
 	}
 
-	result = s.downsampleStats(result, 60) // 60 rows for 30 buckets
+	result = s.downsampleStats(result, 60)
 	return result, nil
 }
 
 // downsampleStats reduces stats to maxRows rows.
-// Each bucket outputs two rows (direction false and true) with average Traffic.
 func (s *StatsService) downsampleStats(stats []model.Stats, maxRows int) []model.Stats {
 	if len(stats) <= maxRows {
 		return stats
@@ -155,8 +169,17 @@ func (s *StatsService) downsampleStats(stats []model.Stats, maxRows int) []model
 func (s *StatsService) GetOnlines() (onlines, error) {
 	return *onlineResources, nil
 }
+
 func (s *StatsService) DelOldStats(days int) error {
-	oldTime := time.Now().AddDate(0, 0, -(days)).Unix()
-	db := database.GetDB()
-	return db.Where("date_time < ?", oldTime).Delete(model.Stats{}).Error
+	oldTime := time.Now().AddDate(0, 0, -days).Unix()
+	cfg := db.Get()
+	newStats := make([]db.Stat, 0, len(cfg.Stats))
+	for _, stat := range cfg.Stats {
+		if stat.DateTime >= oldTime {
+			newStats = append(newStats, stat)
+		}
+	}
+	cfg.Stats = newStats
+	db.Set(cfg)
+	return database.SaveConfig()
 }

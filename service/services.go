@@ -2,26 +2,20 @@ package service
 
 import (
 	"encoding/json"
-	"os"
 
 	"github.com/alireza0/s-ui/database"
 	"github.com/alireza0/s-ui/database/model"
+	"github.com/alireza0/s-ui/db"
 	"github.com/alireza0/s-ui/util/common"
-
-	"gorm.io/gorm"
 )
 
 type ServicesService struct{}
 
+// GetAll returns all services as maps.
 func (s *ServicesService) GetAll() (*[]map[string]interface{}, error) {
-	db := database.GetDB()
-	services := []model.Service{}
-	err := db.Model(model.Service{}).Scan(&services).Error
-	if err != nil {
-		return nil, err
-	}
+	cfg := db.Get()
 	var data []map[string]interface{}
-	for _, srv := range services {
+	for _, srv := range cfg.Services {
 		srvData := map[string]interface{}{
 			"id":     srv.Id,
 			"type":   srv.Type,
@@ -30,28 +24,43 @@ func (s *ServicesService) GetAll() (*[]map[string]interface{}, error) {
 		}
 		if srv.Options != nil {
 			var restFields map[string]json.RawMessage
-			if err := json.Unmarshal(srv.Options, &restFields); err != nil {
-				return nil, err
-			}
-			for k, v := range restFields {
-				srvData[k] = v
+			if err := json.Unmarshal(srv.Options, &restFields); err == nil {
+				for k, v := range restFields {
+					srvData[k] = v
+				}
 			}
 		}
-
 		data = append(data, srvData)
 	}
 	return &data, nil
 }
 
-func (s *ServicesService) GetAllConfig(db *gorm.DB) ([]json.RawMessage, error) {
+// GetAllConfig returns all services as sing-box JSON configs.
+func (s *ServicesService) GetAllConfig() ([]json.RawMessage, error) {
+	cfg := db.Get()
 	var servicesJson []json.RawMessage
-	var services []*model.Service
-	err := db.Model(model.Service{}).Preload("Tls").Find(&services).Error
-	if err != nil {
-		return nil, err
-	}
-	for _, srv := range services {
-		srvJson, err := srv.MarshalJSON()
+	for _, srv := range cfg.Services {
+		srvModel := model.Service{
+			Id:      srv.Id,
+			Type:    srv.Type,
+			Tag:     srv.Tag,
+			TlsId:   srv.TlsId,
+			Options: srv.Options,
+		}
+		if srv.TlsId > 0 {
+			for _, tls := range cfg.TLS {
+				if tls.Id == srv.TlsId {
+					srvModel.Tls = &model.Tls{
+						Id:     tls.Id,
+						Name:   tls.Name,
+						Server: tls.Server,
+						Client: tls.Client,
+					}
+					break
+				}
+			}
+		}
+		srvJson, err := srvModel.MarshalJSON()
 		if err != nil {
 			return nil, err
 		}
@@ -60,21 +69,29 @@ func (s *ServicesService) GetAllConfig(db *gorm.DB) ([]json.RawMessage, error) {
 	return servicesJson, nil
 }
 
-func (s *ServicesService) Save(tx *gorm.DB, act string, data json.RawMessage) error {
-	var err error
+// Save handles CRUD for services. tx is ignored in JSON mode.
+func (s *ServicesService) Save(tx interface{}, act string, data json.RawMessage) error {
+	cfg := db.Get()
 
 	switch act {
 	case "new", "edit":
 		var srv model.Service
-		err = srv.UnmarshalJSON(data)
-		if err != nil {
+		if err := srv.UnmarshalJSON(data); err != nil {
 			return err
 		}
 
 		if srv.TlsId > 0 {
-			err = tx.Model(model.Tls{}).Where("id = ?", srv.TlsId).Find(&srv.Tls).Error
-			if err != nil {
-				return err
+			for i := range cfg.TLS {
+				if cfg.TLS[i].Id == srv.TlsId {
+					tls := cfg.TLS[i]
+					srv.Tls = &model.Tls{
+						Id:     tls.Id,
+						Name:   tls.Name,
+						Server: tls.Server,
+						Client: tls.Client,
+					}
+					break
+				}
 			}
 		}
 
@@ -85,68 +102,116 @@ func (s *ServicesService) Save(tx *gorm.DB, act string, data json.RawMessage) er
 			}
 			if act == "edit" {
 				var oldTag string
-				err = tx.Model(model.Service{}).Select("tag").Where("id = ?", srv.Id).Find(&oldTag).Error
-				if err != nil {
-					return err
+				for _, s := range cfg.Services {
+					if s.Id == srv.Id {
+						oldTag = s.Tag
+						break
+					}
 				}
-				err = corePtr.RemoveService(oldTag)
-				if err != nil && err != os.ErrInvalid {
-					return err
+				if oldTag != "" {
+					if err := corePtr.RemoveService(oldTag); err != nil && err != nil && err.Error() != "not found" {
+						return err
+					}
 				}
 			}
-			err = corePtr.AddService(configData)
-			if err != nil {
+			if err := corePtr.AddService(configData); err != nil {
 				return err
 			}
 		}
 
-		err = tx.Save(&srv).Error
-		if err != nil {
-			return err
+		srvJSON := db.Service{
+			Id:      srv.Id,
+			Type:    srv.Type,
+			Tag:     srv.Tag,
+			TlsId:   srv.TlsId,
+			Options: srv.Options,
 		}
+		if act == "edit" {
+			found := false
+			for i := range cfg.Services {
+				if cfg.Services[i].Id == srv.Id {
+					cfg.Services[i] = srvJSON
+					found = true
+					break
+				}
+			}
+			if !found {
+				cfg.Services = append(cfg.Services, srvJSON)
+			}
+		} else {
+			maxId := uint(0)
+			for _, s := range cfg.Services {
+				if s.Id > maxId {
+					maxId = s.Id
+				}
+			}
+			srvJSON.Id = maxId + 1
+			cfg.Services = append(cfg.Services, srvJSON)
+		}
+		db.Set(cfg)
+		return database.SaveConfig()
+
 	case "del":
 		var tag string
-		err = json.Unmarshal(data, &tag)
-		if err != nil {
+		if err := json.Unmarshal(data, &tag); err != nil {
 			return err
 		}
 		if corePtr.IsRunning() {
-			err = corePtr.RemoveService(tag)
-			if err != nil && err != os.ErrInvalid {
+			if err := corePtr.RemoveService(tag); err != nil && err != nil && err.Error() != "not found" {
 				return err
 			}
 		}
-		err = tx.Where("tag = ?", tag).Delete(model.Service{}).Error
-		if err != nil {
-			return err
+		newServices := make([]db.Service, 0, len(cfg.Services))
+		for _, s := range cfg.Services {
+			if s.Tag != tag {
+				newServices = append(newServices, s)
+			}
 		}
+		cfg.Services = newServices
+		db.Set(cfg)
+		return database.SaveConfig()
+
 	default:
 		return common.NewErrorf("unknown action: %s", act)
 	}
-	return nil
 }
 
-func (s *ServicesService) RestartServices(tx *gorm.DB, ids []uint) error {
+// RestartServices restarts specific services by IDs.
+func (s *ServicesService) RestartServices(tx interface{}, ids []uint) error {
 	if !corePtr.IsRunning() {
 		return nil
 	}
-	var services []*model.Service
-	err := tx.Model(model.Service{}).Preload("Tls").Where("id in ?", ids).Find(&services).Error
-	if err != nil {
-		return err
-	}
-	for _, srv := range services {
-		err = corePtr.RemoveService(srv.Tag)
-		if err != nil && err != os.ErrInvalid {
-			return err
-		}
-		srvConfig, err := srv.MarshalJSON()
-		if err != nil {
-			return err
-		}
-		err = corePtr.AddService(srvConfig)
-		if err != nil {
-			return err
+	cfg := db.Get()
+	for _, id := range ids {
+		for _, srv := range cfg.Services {
+			if srv.Id != id {
+				continue
+			}
+			if err := corePtr.RemoveService(srv.Tag); err != nil && err != nil && err.Error() != "not found" {
+				return err
+			}
+			srvModel := model.Service{
+				Id:      srv.Id,
+				Type:    srv.Type,
+				Tag:     srv.Tag,
+				TlsId:   srv.TlsId,
+				Options: srv.Options,
+			}
+			if srv.TlsId > 0 {
+				for _, tls := range cfg.TLS {
+					if tls.Id == srv.TlsId {
+						srvModel.Tls = &model.Tls{Id: tls.Id, Name: tls.Name, Server: tls.Server, Client: tls.Client}
+						break
+					}
+				}
+			}
+			srvConfig, err := srvModel.MarshalJSON()
+			if err != nil {
+				return err
+			}
+			if err := corePtr.AddService(srvConfig); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

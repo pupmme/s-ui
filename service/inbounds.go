@@ -8,10 +8,9 @@ import (
 
 	"github.com/alireza0/s-ui/database"
 	"github.com/alireza0/s-ui/database/model"
+	"github.com/alireza0/s-ui/db"
 	"github.com/alireza0/s-ui/util"
 	"github.com/alireza0/s-ui/util/common"
-
-	"gorm.io/gorm"
 )
 
 type InboundService struct {
@@ -26,173 +25,249 @@ func (s *InboundService) Get(ids string) (*[]map[string]interface{}, error) {
 }
 
 func (s *InboundService) getById(ids string) (*[]map[string]interface{}, error) {
-	var inbound []model.Inbound
-	var result []map[string]interface{}
-	db := database.GetDB()
-	err := db.Model(model.Inbound{}).Where("id in ?", strings.Split(ids, ",")).Scan(&inbound).Error
-	if err != nil {
-		return nil, err
+	cfg := db.Get()
+	idMap := make(map[string]bool)
+	for _, id := range strings.Split(ids, ",") {
+		idMap[id] = true
 	}
-	for _, inb := range inbound {
-		inbData, err := inb.MarshalFull()
-		if err != nil {
-			return nil, err
+	var result []map[string]interface{}
+	for _, inb := range cfg.Inbounds {
+		if !idMap[common.Itoa(int(inb.Id))] {
+			continue
 		}
-		result = append(result, *inbData)
+		data := s.inboundToMap(inb)
+		if data == nil {
+			continue
+		}
+		result = append(result, *data)
 	}
 	return &result, nil
 }
 
 func (s *InboundService) GetAll() (*[]map[string]interface{}, error) {
-	db := database.GetDB()
-	inbounds := []model.Inbound{}
-	err := db.Model(model.Inbound{}).Scan(&inbounds).Error
-	if err != nil {
-		return nil, err
-	}
+	cfg := db.Get()
 	var data []map[string]interface{}
-	for _, inbound := range inbounds {
-		var shadowtls_version uint
-		ss_managed := false
-		inbData := map[string]interface{}{
-			"id":     inbound.Id,
-			"type":   inbound.Type,
-			"tag":    inbound.Tag,
-			"tls_id": inbound.TlsId,
+	for _, inbound := range cfg.Inbounds {
+		m := s.inboundToMap(inbound)
+		if m == nil {
+			continue
 		}
-		if inbound.Options != nil {
-			var restFields map[string]json.RawMessage
-			if err := json.Unmarshal(inbound.Options, &restFields); err != nil {
-				return nil, err
-			}
-			inbData["listen"] = restFields["listen"]
-			inbData["listen_port"] = restFields["listen_port"]
-			if inbound.Type == "shadowtls" {
-				json.Unmarshal(restFields["version"], &shadowtls_version)
-			}
-			if inbound.Type == "shadowsocks" {
-				json.Unmarshal(restFields["managed"], &ss_managed)
-			}
-		}
-		if s.hasUser(inbound.Type) &&
-			!(inbound.Type == "shadowtls" && shadowtls_version < 3) &&
-			!(inbound.Type == "shadowsocks" && ss_managed) {
-			users := []string{}
-			err = db.Raw("SELECT clients.name FROM clients, json_each(clients.inbounds) as je WHERE je.value = ?", inbound.Id).Scan(&users).Error
-			if err != nil {
-				return nil, err
-			}
-			inbData["users"] = users
-		}
-
-		data = append(data, inbData)
+		data = append(data, *m)
 	}
 	return &data, nil
 }
 
-func (s *InboundService) FromIds(ids []uint) ([]*model.Inbound, error) {
-	db := database.GetDB()
-	inbounds := []*model.Inbound{}
-	err := db.Model(model.Inbound{}).Where("id in ?", ids).Scan(&inbounds).Error
-	if err != nil {
-		return nil, err
+func (s *InboundService) inboundToMap(inb db.Inbound) *map[string]interface{} {
+	var shadowtls_version uint
+	ss_managed := false
+	inbData := map[string]interface{}{
+		"id":     inb.Id,
+		"type":   inb.Type,
+		"tag":    inb.Tag,
+		"tls_id": inb.TlsId,
 	}
-	return inbounds, nil
+	if inb.Options != nil {
+		var restFields map[string]json.RawMessage
+		if err := json.Unmarshal(inb.Options, &restFields); err == nil {
+			inbData["listen"] = restFields["listen"]
+			inbData["listen_port"] = restFields["listen_port"]
+			if inb.Type == "shadowtls" {
+				json.Unmarshal(restFields["version"], &shadowtls_version)
+			}
+			if inb.Type == "shadowsocks" {
+				json.Unmarshal(restFields["managed"], &ss_managed)
+			}
+		}
+	}
+	if s.hasUser(inb.Type) &&
+		!(inb.Type == "shadowtls" && shadowtls_version < 3) &&
+		!(inb.Type == "shadowsocks" && ss_managed) {
+		users := s.getClientNamesByInbound(inb.Id)
+		inbData["users"] = users
+	}
+	return &inbData
 }
 
-func (s *InboundService) Save(tx *gorm.DB, act string, data json.RawMessage, initUserIds string, hostname string) error {
-	var err error
+func (s *InboundService) getClientNamesByInbound(inboundId uint) []string {
+	cfg := db.Get()
+	var names []string
+	for _, client := range cfg.Clients {
+		var ids []uint
+		if err := json.Unmarshal(client.Inbounds, &ids); err != nil {
+			continue
+		}
+		for _, id := range ids {
+			if id == inboundId {
+				names = append(names, client.Name)
+				break
+			}
+		}
+	}
+	return names
+}
+
+func (s *InboundService) FromIds(ids []uint) ([]*model.Inbound, error) {
+	cfg := db.Get()
+	var result []*model.Inbound
+	for _, inb := range cfg.Inbounds {
+		for _, id := range ids {
+			if inb.Id == id {
+				result = append(result, &model.Inbound{
+					Id:      inb.Id,
+					Type:    inb.Type,
+					Tag:     inb.Tag,
+					TlsId:   inb.TlsId,
+					Addrs:   inb.Addrs,
+					OutJson: inb.OutJson,
+					Options: inb.Options,
+				})
+				break
+			}
+		}
+	}
+	return result, nil
+}
+
+// Save handles CRUD for inbounds. tx parameter is ignored in JSON mode.
+func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, initUserIds string, hostname string) error {
+	cfg := db.Get()
 
 	switch act {
 	case "new", "edit":
 		var inbound model.Inbound
-		err = inbound.UnmarshalJSON(data)
-		if err != nil {
+		if err := inbound.UnmarshalJSON(data); err != nil {
 			return err
 		}
+
 		if inbound.TlsId > 0 {
-			err = tx.Model(model.Tls{}).Where("id = ?", inbound.TlsId).Find(&inbound.Tls).Error
-			if err != nil {
-				return err
+			for i := range cfg.TLS {
+				if cfg.TLS[i].Id == inbound.TlsId {
+					tls := cfg.TLS[i]
+					inbound.Tls = &model.Tls{
+						Id:     tls.Id,
+						Name:   tls.Name,
+						Server: tls.Server,
+						Client: tls.Client,
+					}
+					break
+				}
 			}
 		}
+
 		var oldTag string
 		if act == "edit" {
-			err = tx.Model(model.Inbound{}).Select("tag").Where("id = ?", inbound.Id).Find(&oldTag).Error
-			if err != nil {
-				return err
+			for _, existing := range cfg.Inbounds {
+				if existing.Id == inbound.Id {
+					oldTag = existing.Tag
+					break
+				}
 			}
 		}
 
 		if corePtr.IsRunning() {
-			if act == "edit" {
-				err = corePtr.RemoveInbound(oldTag)
-				if err != nil && err != os.ErrInvalid {
+			if act == "edit" && oldTag != "" {
+				if err := corePtr.RemoveInbound(oldTag); err != nil && err != nil && err.Error() != "invalid" {
 					return err
 				}
 			}
-
 			inboundConfig, err := inbound.MarshalJSON()
 			if err != nil {
 				return err
 			}
-
 			if act == "edit" {
-				inboundConfig, err = s.addUsers(tx, inboundConfig, inbound.Id, inbound.Type)
+				inboundConfig, err = s.addUsersJSON(inboundConfig, inbound.Id, inbound.Type)
 			} else {
-				inboundConfig, err = s.initUsers(tx, inboundConfig, initUserIds, inbound.Type)
+				inboundConfig, err = s.initUsersJSON(inboundConfig, initUserIds, inbound.Type)
 			}
 			if err != nil {
 				return err
 			}
+			if err := corePtr.AddInbound(inboundConfig); err != nil {
+				return err
+			}
+		}
 
-			err = corePtr.AddInbound(inboundConfig)
+		if err := util.FillOutJson(&inbound, hostname); err != nil {
+			return err
+		}
+
+		inbJSON := db.Inbound{
+			Id:      inbound.Id,
+			Type:    inbound.Type,
+			Tag:     inbound.Tag,
+			TlsId:   inbound.TlsId,
+			Addrs:   inbound.Addrs,
+			OutJson: inbound.OutJson,
+			Options: inbound.Options,
+		}
+		if act == "edit" {
+			found := false
+			for i := range cfg.Inbounds {
+				if cfg.Inbounds[i].Id == inbound.Id {
+					cfg.Inbounds[i] = inbJSON
+					found = true
+					break
+				}
+			}
+			if !found {
+				cfg.Inbounds = append(cfg.Inbounds, inbJSON)
+			}
+		} else {
+			maxId := uint(0)
+			for _, ib := range cfg.Inbounds {
+				if ib.Id > maxId {
+					maxId = ib.Id
+				}
+			}
+			inbJSON.Id = maxId + 1
+			cfg.Inbounds = append(cfg.Inbounds, inbJSON)
+		}
+		db.Set(cfg)
+		if err := database.SaveConfig(); err != nil {
+			return err
+		}
+
+		if act == "new" {
+			err := s.ClientService.UpdateClientsOnInboundAddJSON(initUserIds, inbJSON.Id, hostname)
+			if err != nil {
+				return err
+			}
+		} else {
+			err := s.ClientService.UpdateLinksByInboundChangeJSON(inbJSON, oldTag, hostname)
 			if err != nil {
 				return err
 			}
 		}
 
-		err = util.FillOutJson(&inbound, hostname)
-		if err != nil {
-			return err
-		}
-
-		err = tx.Save(&inbound).Error
-		if err != nil {
-			return err
-		}
-		switch act {
-		case "new":
-			err = s.ClientService.UpdateClientsOnInboundAdd(tx, initUserIds, inbound.Id, hostname)
-		case "edit":
-			err = s.ClientService.UpdateLinksByInboundChange(tx, &[]model.Inbound{inbound}, hostname, oldTag)
-		}
-		if err != nil {
-			return err
-		}
 	case "del":
 		var tag string
-		err = json.Unmarshal(data, &tag)
-		if err != nil {
+		if err := json.Unmarshal(data, &tag); err != nil {
 			return err
 		}
 		if corePtr.IsRunning() {
-			err = corePtr.RemoveInbound(tag)
-			if err != nil && err != os.ErrInvalid {
+			if err := corePtr.RemoveInbound(tag); err != nil && err != nil && err.Error() != "invalid" {
 				return err
 			}
 		}
 		var id uint
-		err = tx.Model(model.Inbound{}).Select("id").Where("tag = ?", tag).Scan(&id).Error
-		if err != nil {
+		for _, inb := range cfg.Inbounds {
+			if inb.Tag == tag {
+				id = inb.Id
+				break
+			}
+		}
+		if err := s.ClientService.UpdateClientsOnInboundDeleteJSON(id, tag); err != nil {
 			return err
 		}
-		err = s.ClientService.UpdateClientsOnInboundDelete(tx, id, tag)
-		if err != nil {
-			return err
+		newInbounds := make([]db.Inbound, 0, len(cfg.Inbounds))
+		for _, inb := range cfg.Inbounds {
+			if inb.Tag != tag {
+				newInbounds = append(newInbounds, inb)
+			}
 		}
-		err = tx.Where("tag = ?", tag).Delete(model.Inbound{}).Error
-		if err != nil {
+		cfg.Inbounds = newInbounds
+		db.Set(cfg)
+		if err := database.SaveConfig(); err != nil {
 			return err
 		}
 	default:
@@ -201,39 +276,78 @@ func (s *InboundService) Save(tx *gorm.DB, act string, data json.RawMessage, ini
 	return nil
 }
 
-func (s *InboundService) UpdateOutJsons(tx *gorm.DB, inboundIds []uint, hostname string) error {
-	var inbounds []model.Inbound
-	err := tx.Model(model.Inbound{}).Preload("Tls").Where("id in ?", inboundIds).Find(&inbounds).Error
-	if err != nil {
-		return err
-	}
-	for _, inbound := range inbounds {
-		err = util.FillOutJson(&inbound, hostname)
-		if err != nil {
-			return err
+func (s *InboundService) UpdateOutJsons(tx interface{}, inboundIds []uint, hostname string) error {
+	cfg := db.Get()
+	for _, inboundId := range inboundIds {
+		for i := range cfg.Inbounds {
+			if cfg.Inbounds[i].Id != inboundId {
+				continue
+			}
+			inb := &cfg.Inbounds[i]
+			inbModel := &model.Inbound{
+				Id:      inb.Id,
+				Type:    inb.Type,
+				Tag:     inb.Tag,
+				TlsId:   inb.TlsId,
+				Addrs:   inb.Addrs,
+				OutJson: inb.OutJson,
+				Options: inb.Options,
+			}
+			if inb.TlsId > 0 {
+				for _, tls := range cfg.TLS {
+					if tls.Id == inb.TlsId {
+						inbModel.Tls = &model.Tls{
+							Id:     tls.Id,
+							Name:   tls.Name,
+							Server: tls.Server,
+							Client: tls.Client,
+						}
+						break
+					}
+				}
+			}
+			if err := util.FillOutJson(inbModel, hostname); err != nil {
+				return err
+			}
+			inb.OutJson = inbModel.OutJson
 		}
-		err = tx.Model(model.Inbound{}).Where("tag = ?", inbound.Tag).Update("out_json", inbound.OutJson).Error
-		if err != nil {
-			return err
-		}
 	}
-
-	return nil
+	db.Set(cfg)
+	return database.SaveConfig()
 }
 
-func (s *InboundService) GetAllConfig(db *gorm.DB) ([]json.RawMessage, error) {
+// GetAllConfig returns all inbounds as sing-box JSON configs.
+func (s *InboundService) GetAllConfig() ([]json.RawMessage, error) {
+	cfg := db.Get()
 	var inboundsJson []json.RawMessage
-	var inbounds []*model.Inbound
-	err := db.Model(model.Inbound{}).Preload("Tls").Find(&inbounds).Error
-	if err != nil {
-		return nil, err
-	}
-	for _, inbound := range inbounds {
-		inboundJson, err := inbound.MarshalJSON()
+	for _, inp := range cfg.Inbounds {
+		inbModel := model.Inbound{
+			Id:      inp.Id,
+			Type:    inp.Type,
+			Tag:     inp.Tag,
+			TlsId:   inp.TlsId,
+			Addrs:   inp.Addrs,
+			OutJson: inp.OutJson,
+			Options: inp.Options,
+		}
+		if inp.TlsId > 0 {
+			for _, tls := range cfg.TLS {
+				if tls.Id == inp.TlsId {
+					inbModel.Tls = &model.Tls{
+						Id:     tls.Id,
+						Name:   tls.Name,
+						Server: tls.Server,
+						Client: tls.Client,
+					}
+					break
+				}
+			}
+		}
+		inboundJson, err := inbModel.MarshalJSON()
 		if err != nil {
 			return nil, err
 		}
-		inboundJson, err = s.addUsers(db, inboundJson, inbound.Id, inbound.Type)
+		inboundJson, err = s.addUsersJSON(inboundJson, inp.Id, inp.Type)
 		if err != nil {
 			return nil, err
 		}
@@ -250,7 +364,7 @@ func (s *InboundService) hasUser(inboundType string) bool {
 	return false
 }
 
-func (s *InboundService) fetchUsers(db *gorm.DB, inboundType string, condition string, inbound map[string]interface{}) ([]json.RawMessage, error) {
+func (s *InboundService) fetchUsersJSON(inboundId uint, inboundType string, inbound map[string]interface{}) ([]json.RawMessage, error) {
 	if inboundType == "shadowtls" {
 		version, _ := inbound["version"].(float64)
 		if int(version) < 3 {
@@ -263,99 +377,137 @@ func (s *InboundService) fetchUsers(db *gorm.DB, inboundType string, condition s
 			inboundType = "shadowsocks16"
 		}
 	}
-
-	var users []string
-
-	err := db.Raw(
-		fmt.Sprintf(`SELECT json_extract(clients.config, "$.%s")
-		FROM clients WHERE enable = true AND %s`,
-			inboundType, condition)).Scan(&users).Error
-	if err != nil {
-		return nil, err
-	}
 	var usersJson []json.RawMessage
-	for _, user := range users {
-		if inboundType == "vless" && inbound["tls"] == nil {
-			user = strings.Replace(user, "xtls-rprx-vision", "", -1)
+	cfg := db.Get()
+	for _, client := range cfg.Clients {
+		if !client.Enable {
+			continue
 		}
-		usersJson = append(usersJson, json.RawMessage(user))
+		var ids []uint
+		if err := json.Unmarshal(client.Inbounds, &ids); err != nil {
+			continue
+		}
+		hasInbound := false
+		for _, id := range ids {
+			if id == inboundId {
+				hasInbound = true
+				break
+			}
+		}
+		if !hasInbound {
+			continue
+		}
+		// client.Config is a JSON object keyed by inbound type
+		if client.Config == nil {
+			continue
+		}
+		var cfgMap map[string]json.RawMessage
+		if err := json.Unmarshal(client.Config, &cfgMap); err != nil {
+			continue
+		}
+		cfgRaw, ok := cfgMap[inboundType]
+		if !ok {
+			continue
+		}
+		cfgBytes := []byte(cfgRaw)
+		if inboundType == "vless" && inbound["tls"] == nil {
+			cfgStr := strings.Replace(string(cfgBytes), "xtls-rprx-vision", "", -1)
+			cfgBytes = []byte(cfgStr)
+		}
+		usersJson = append(usersJson, json.RawMessage(cfgBytes))
 	}
 	return usersJson, nil
 }
 
-func (s *InboundService) addUsers(db *gorm.DB, inboundJson []byte, inboundId uint, inboundType string) ([]byte, error) {
+func (s *InboundService) addUsersJSON(inboundJson []byte, inboundId uint, inboundType string) ([]byte, error) {
 	if !s.hasUser(inboundType) {
 		return inboundJson, nil
 	}
-
 	var inbound map[string]interface{}
-	err := json.Unmarshal(inboundJson, &inbound)
+	if err := json.Unmarshal(inboundJson, &inbound); err != nil {
+		return nil, err
+	}
+	users, err := s.fetchUsersJSON(inboundId, inboundType, inbound)
 	if err != nil {
 		return nil, err
 	}
-
-	condition := fmt.Sprintf("%d IN (SELECT json_each.value FROM json_each(clients.inbounds))", inboundId)
-	inbound["users"], err = s.fetchUsers(db, inboundType, condition, inbound)
-	if err != nil {
-		return nil, err
-	}
-
+	inbound["users"] = users
 	return json.Marshal(inbound)
 }
 
-func (s *InboundService) initUsers(db *gorm.DB, inboundJson []byte, clientIds string, inboundType string) ([]byte, error) {
-	ClientIds := strings.Split(clientIds, ",")
-	if len(ClientIds) == 0 {
-		return inboundJson, nil
-	}
-
+func (s *InboundService) initUsersJSON(inboundJson []byte, clientIds string, inboundType string) ([]byte, error) {
 	if !s.hasUser(inboundType) {
 		return inboundJson, nil
 	}
-
 	var inbound map[string]interface{}
-	err := json.Unmarshal(inboundJson, &inbound)
-	if err != nil {
+	if err := json.Unmarshal(inboundJson, &inbound); err != nil {
 		return nil, err
 	}
-
-	condition := fmt.Sprintf("id IN (%s)", strings.Join(ClientIds, ","))
-	inbound["users"], err = s.fetchUsers(db, inboundType, condition, inbound)
-	if err != nil {
-		return nil, err
+	clientIdList := strings.Split(clientIds, ",")
+	clientIdSet := make(map[string]bool)
+	for _, c := range clientIdList {
+		clientIdSet[c] = true
 	}
-
+	cfg := db.Get()
+	var usersJson []json.RawMessage
+	for _, client := range cfg.Clients {
+		if !client.Enable {
+			continue
+		}
+		if !clientIdSet[common.Itoa(int(client.Id))] {
+			continue
+		}
+		if client.Config == nil {
+			continue
+		}
+		var cfgMap map[string]json.RawMessage
+		if err := json.Unmarshal(client.Config, &cfgMap); err != nil {
+			continue
+		}
+		cfgRaw, ok := cfgMap[inboundType]
+		if !ok {
+			continue
+		}
+		usersJson = append(usersJson, cfgRaw)
+	}
+	inbound["users"] = usersJson
 	return json.Marshal(inbound)
 }
 
-func (s *InboundService) RestartInbounds(tx *gorm.DB, ids []uint) error {
+func (s *InboundService) RestartInbounds(tx interface{}, ids []uint) error {
 	if !corePtr.IsRunning() {
 		return nil
 	}
-	var inbounds []*model.Inbound
-	err := tx.Model(model.Inbound{}).Preload("Tls").Where("id in ?", ids).Find(&inbounds).Error
-	if err != nil {
-		return err
-	}
-	for _, inbound := range inbounds {
-		err = corePtr.RemoveInbound(inbound.Tag)
-		if err != nil && err != os.ErrInvalid {
-			return err
-		}
-		// Close all existing connections
-		corePtr.GetInstance().ConnTracker().CloseConnByInbound(inbound.Tag)
+	for _, id := range ids {
+		for _, inp := range db.Get().Inbounds {
+			if inp.Id != id {
+				continue
+			}
+			if err := corePtr.RemoveInbound(inp.Tag); err != nil && err != nil && err.Error() != "invalid" {
+				return err
+			}
+			corePtr.GetInstance().ConnTracker().CloseConnByInbound(inp.Tag)
 
-		inboundConfig, err := inbound.MarshalJSON()
-		if err != nil {
-			return err
-		}
-		inboundConfig, err = s.addUsers(tx, inboundConfig, inbound.Id, inbound.Type)
-		if err != nil {
-			return err
-		}
-		err = corePtr.AddInbound(inboundConfig)
-		if err != nil {
-			return err
+			inbModel := &model.Inbound{
+				Id:      inp.Id,
+				Type:    inp.Type,
+				Tag:     inp.Tag,
+				TlsId:   inp.TlsId,
+				Addrs:   inp.Addrs,
+				OutJson: inp.OutJson,
+				Options: inp.Options,
+			}
+			inboundConfig, err := inbModel.MarshalJSON()
+			if err != nil {
+				return err
+			}
+			inboundConfig, err = s.addUsersJSON(inboundConfig, inp.Id, inp.Type)
+			if err != nil {
+				return err
+			}
+			if err := corePtr.AddInbound(inboundConfig); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

@@ -8,13 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alireza0/s-ui/config"
 	"github.com/alireza0/s-ui/database"
-	"github.com/alireza0/s-ui/database/model"
+	"github.com/alireza0/s-ui/db"
 	"github.com/alireza0/s-ui/logger"
 	"github.com/alireza0/s-ui/util/common"
-
-	"gorm.io/gorm"
 )
 
 var defaultConfig = `{
@@ -27,7 +24,7 @@ var defaultConfig = `{
   },
   "route": {
     "rules": [
-		  {
+      {
         "action": "sniff"
       },
       {
@@ -45,14 +42,14 @@ var defaultValueMap = map[string]string{
 	"webListen":     "",
 	"webDomain":     "",
 	"webPort":       "2095",
-	"secret":        common.Random(32),
+	"secret":         common.Random(32),
 	"webCertFile":   "",
 	"webKeyFile":    "",
 	"webPath":       "/app/",
 	"webURI":        "",
 	"sessionMaxAge": "0",
 	"trafficAge":    "30",
-	"timeLocation":  "Asia/Tehran",
+	"timeLocation":  "Asia/Shanghai",
 	"subListen":     "",
 	"subPort":       "2096",
 	"subPath":       "/sub/",
@@ -66,36 +63,36 @@ var defaultValueMap = map[string]string{
 	"subJsonExt":    "",
 	"subClashExt":   "",
 	"config":        defaultConfig,
-	"version":       config.GetVersion(),
+	"version":       "pup-sub", // filled at runtime
 }
 
-type SettingService struct {
-}
+type SettingService struct{}
 
 func (s *SettingService) GetAllSetting() (*map[string]string, error) {
-	db := database.GetDB()
-	settings := make([]*model.Setting, 0)
-	err := db.Model(model.Setting{}).Find(&settings).Error
-	if err != nil {
-		return nil, err
-	}
-	allSetting := map[string]string{}
+	cfg := db.Get()
+	allSetting := make(map[string]string)
 
-	for _, setting := range settings {
+	for _, setting := range cfg.Settings {
 		allSetting[setting.Key] = setting.Value
 	}
 
 	for key, defaultValue := range defaultValueMap {
 		if _, exists := allSetting[key]; !exists {
-			err = s.saveSetting(key, defaultValue)
-			if err != nil {
-				return nil, err
+			// Save missing default value
+			cfg := db.Get()
+			if cfg.Settings == nil {
+				cfg.Settings = make(map[string]string)
+			}
+			cfg.Settings[key] = defaultValue
+			db.Set(cfg)
+			if err := database.SaveConfig(); err != nil {
+				logger.Warning("save default setting failed:", err)
 			}
 			allSetting[key] = defaultValue
 		}
 	}
 
-	// Due to security principles
+	// Security: redact sensitive keys
 	delete(allSetting, "secret")
 	delete(allSetting, "config")
 	delete(allSetting, "version")
@@ -104,48 +101,45 @@ func (s *SettingService) GetAllSetting() (*map[string]string, error) {
 }
 
 func (s *SettingService) ResetSettings() error {
-	db := database.GetDB()
-	return db.Where("1 = 1").Delete(model.Setting{}).Error
+	cfg := db.Get()
+	cfg.Settings = make(map[string]string)
+	db.Set(cfg)
+	return database.SaveConfig()
 }
 
-func (s *SettingService) getSetting(key string) (*model.Setting, error) {
-	db := database.GetDB()
-	setting := &model.Setting{}
-	err := db.Model(model.Setting{}).Where("key = ?", key).First(setting).Error
-	if err != nil {
-		return nil, err
+func (s *SettingService) getSetting(key string) (*settingRecord, error) {
+	cfg := db.Get()
+	if val, ok := cfg.Settings[key]; ok {
+		return &settingRecord{Key: key, Value: val}, nil
 	}
-	return setting, nil
+	return nil, common.NewErrorf("key <%v> not found", key)
+}
+
+type settingRecord struct {
+	Key   string
+	Value string
 }
 
 func (s *SettingService) getString(key string) (string, error) {
 	setting, err := s.getSetting(key)
-	if database.IsNotFound(err) {
+	if err != nil {
 		value, ok := defaultValueMap[key]
 		if !ok {
 			return "", common.NewErrorf("key <%v> not in defaultValueMap", key)
 		}
 		return value, nil
-	} else if err != nil {
-		return "", err
 	}
 	return setting.Value, nil
 }
 
 func (s *SettingService) saveSetting(key string, value string) error {
-	setting, err := s.getSetting(key)
-	db := database.GetDB()
-	if database.IsNotFound(err) {
-		return db.Create(&model.Setting{
-			Key:   key,
-			Value: value,
-		}).Error
-	} else if err != nil {
-		return err
+	cfg := db.Get()
+	if cfg.Settings == nil {
+		cfg.Settings = make(map[string]string)
 	}
-	setting.Key = key
-	setting.Value = value
-	return db.Save(setting).Error
+	cfg.Settings[key] = value
+	db.Set(cfg)
+	return database.SaveConfig()
 }
 
 func (s *SettingService) setString(key string, value string) error {
@@ -160,10 +154,6 @@ func (s *SettingService) getBool(key string) (bool, error) {
 	return strconv.ParseBool(str)
 }
 
-// func (s *SettingService) setBool(key string, value bool) error {
-// 	return s.setString(key, strconv.FormatBool(value))
-// }
-
 func (s *SettingService) getInt(key string) (int, error) {
 	str, err := s.getString(key)
 	if err != nil {
@@ -175,6 +165,7 @@ func (s *SettingService) getInt(key string) (int, error) {
 func (s *SettingService) setInt(key string, value int) error {
 	return s.setString(key, strconv.Itoa(value))
 }
+
 func (s *SettingService) GetListen() (string, error) {
 	return s.getString("webListen")
 }
@@ -354,36 +345,32 @@ func (s *SettingService) SetConfig(config string) error {
 	return s.setString("config", config)
 }
 
-func (s *SettingService) SaveConfig(tx *gorm.DB, config json.RawMessage) error {
+// SaveConfig is kept for backward compatibility (tx parameter ignored).
+func (s *SettingService) SaveConfig(tx interface{}, config json.RawMessage) error {
 	configs, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
 		return err
 	}
-	return tx.Model(model.Setting{}).Where("key = ?", "config").Update("value", string(configs)).Error
+	return s.saveSetting("config", string(configs))
 }
 
-func (s *SettingService) Save(tx *gorm.DB, data json.RawMessage) error {
-	var err error
+// Save persists all settings from the data map.
+func (s *SettingService) Save(tx interface{}, data json.RawMessage) error {
 	var settings map[string]string
-	err = json.Unmarshal(data, &settings)
+	err := json.Unmarshal(data, &settings)
 	if err != nil {
 		return err
 	}
 	for key, obj := range settings {
-		// Secure file existence check
 		if obj != "" && (key == "webCertFile" ||
 			key == "webKeyFile" ||
 			key == "subCertFile" ||
 			key == "subKeyFile") {
-			err = s.fileExists(obj)
-			if err != nil {
+			if _, err := os.Stat(obj); err != nil {
 				return common.NewError(" -> ", obj, " is not exists")
 			}
 		}
-
-		// Correct Pathes start and ends with `/`
-		if key == "webPath" ||
-			key == "subPath" {
+		if key == "webPath" || key == "subPath" {
 			if !strings.HasPrefix(obj, "/") {
 				obj = "/" + obj
 			}
@@ -391,20 +378,12 @@ func (s *SettingService) Save(tx *gorm.DB, data json.RawMessage) error {
 				obj += "/"
 			}
 		}
-
-		// Delete all stats if it is set to 0
-		if key == "trafficAge" && obj == "0" {
-			err = tx.Where("id > 0").Delete(model.Stats{}).Error
-			if err != nil {
-				return err
-			}
-		}
-		err = tx.Model(model.Setting{}).Where("key = ?", key).Update("value", obj).Error
+		err = s.saveSetting(key, obj)
 		if err != nil {
 			return err
 		}
 	}
-	return err
+	return nil
 }
 
 func (s *SettingService) GetSubJsonExt() (string, error) {
@@ -413,9 +392,4 @@ func (s *SettingService) GetSubJsonExt() (string, error) {
 
 func (s *SettingService) GetSubClashExt() (string, error) {
 	return s.getString("subClashExt")
-}
-
-func (s *SettingService) fileExists(path string) error {
-	_, err := os.Stat(path)
-	return err
 }

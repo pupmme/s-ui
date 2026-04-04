@@ -4,120 +4,105 @@ import (
 	"encoding/json"
 	"os"
 	"path"
-	"strings"
-	"time"
+	"sync"
 
 	"github.com/alireza0/s-ui/config"
-	"github.com/alireza0/s-ui/database/model"
-
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	"github.com/alireza0/s-ui/db"
+	"github.com/alireza0/s-ui/logger"
 )
 
-var db *gorm.DB
+// cfgPath is the path to the JSON config file.
+var cfgPath string
 
-func initUser() error {
-	var count int64
-	err := db.Model(&model.User{}).Count(&count).Error
+// initMu protects first-time initialization.
+var initMu sync.Mutex
+
+// cfgMu protects write operations.
+var cfgMu sync.Mutex
+
+// InitDB loads (or creates) the JSON config file and seeds defaults.
+// This replaces the previous SQLite + GORM InitDB.
+func InitDB(dbPath string) error {
+	initMu.Lock()
+	defer initMu.Unlock()
+
+	cfgPath = dbPath
+
+	// Ensure parent directory exists
+	dir := path.Dir(dbPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+
+	err := db.Load(dbPath)
 	if err != nil {
 		return err
 	}
-	if count == 0 {
-		user := &model.User{
+
+	cfg := db.Get()
+	if cfg == nil {
+		cfg = &db.Config{Version: 1, Settings: make(map[string]string)}
+		db.Set(cfg)
+	}
+
+	// Seed default admin user if no users exist
+	if len(cfg.Users) == 0 {
+		cfg.Users = append(cfg.Users, db.User{
+			Id:       1,
 			Username: "admin",
 			Password: "admin",
+		})
+		db.Set(cfg)
+		if err := db.Save(dbPath); err != nil {
+			logger.Warning("failed to save default admin user:", err)
 		}
-		return db.Create(user).Error
 	}
+
+	// Seed default outbounds if none exist
+	if len(cfg.Outbounds) == 0 {
+		cfg.Outbounds = append(cfg.Outbounds, db.Outbound{
+			Id:      1,
+			Type:    "direct",
+			Tag:     "direct",
+			Options: json.RawMessage(`{}`),
+		})
+		db.Set(cfg)
+		if err := db.Save(dbPath); err != nil {
+			logger.Warning("failed to save default outbound:", err)
+		}
+	}
+
 	return nil
 }
 
+// OpenDB exists for backward compatibility (previous SQLite path).
+// No-op now that we use JSON.
 func OpenDB(dbPath string) error {
-	dir := path.Dir(dbPath)
-	err := os.MkdirAll(dir, 01740)
-	if err != nil {
-		return err
-	}
-
-	var gormLogger logger.Interface
-
-	if config.IsDebug() {
-		gormLogger = logger.Default
-	} else {
-		gormLogger = logger.Discard
-	}
-
-	c := &gorm.Config{
-		Logger: gormLogger,
-	}
-	sep := "?"
-	if strings.Contains(dbPath, "?") {
-		sep = "&"
-	}
-	dsn := dbPath + sep + "_busy_timeout=10000&_journal_mode=WAL"
-	db, err = gorm.Open(sqlite.Open(dsn), c)
-	if err != nil {
-		return err
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		return err
-	}
-	sqlDB.SetMaxOpenConns(25)
-	sqlDB.SetMaxIdleConns(5)
-	sqlDB.SetConnMaxLifetime(time.Hour)
-
-	if config.IsDebug() {
-		db = db.Debug()
-	}
 	return nil
 }
 
-func InitDB(dbPath string) error {
-	err := OpenDB(dbPath)
-	if err != nil {
-		return err
-	}
-
-	// Default Outbounds
-	if !db.Migrator().HasTable(&model.Outbound{}) {
-		db.Migrator().CreateTable(&model.Outbound{})
-		defaultOutbound := []model.Outbound{
-			{Type: "direct", Tag: "direct", Options: json.RawMessage(`{}`)},
-		}
-		db.Create(&defaultOutbound)
-	}
-
-	err = db.AutoMigrate(
-		&model.Setting{},
-		&model.Tls{},
-		&model.Inbound{},
-		&model.Outbound{},
-		&model.Service{},
-		&model.Endpoint{},
-		&model.User{},
-		&model.Tokens{},
-		&model.Stats{},
-		&model.Client{},
-		&model.Changes{},
-	)
-	if err != nil {
-		return err
-	}
-	err = initUser()
-	if err != nil {
-		return err
-	}
-
+// GetDB returns nil. All data access goes through the db package.
+func GetDB() interface{} {
 	return nil
 }
 
-func GetDB() *gorm.DB {
-	return db
-}
-
+// IsNotFound always returns false in JSON mode.
+// Callers that previously checked IsNotFound should adapt to nil checks.
 func IsNotFound(err error) bool {
-	return err == gorm.ErrRecordNotFound
+	return false
+}
+
+// SaveConfig persists the JSON config to disk.
+// Exported so callers that do direct saves can trigger it.
+func SaveConfig() error {
+	if cfgPath == "" {
+		cfgPath = config.GetDBPath()
+	}
+	return db.Save(cfgPath)
+}
+
+// WithTx is a no-op stub for API compatibility.
+// Previous GORM transaction closures should be replaced with direct calls.
+func WithTx(fn func() error) error {
+	return fn()
 }

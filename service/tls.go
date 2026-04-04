@@ -5,9 +5,8 @@ import (
 
 	"github.com/alireza0/s-ui/database"
 	"github.com/alireza0/s-ui/database/model"
+	"github.com/alireza0/s-ui/db"
 	"github.com/alireza0/s-ui/util/common"
-
-	"gorm.io/gorm"
 )
 
 type TlsService struct {
@@ -16,90 +15,125 @@ type TlsService struct {
 }
 
 func (s *TlsService) GetAll() ([]model.Tls, error) {
-	db := database.GetDB()
-	tlsConfig := []model.Tls{}
-	err := db.Model(model.Tls{}).Scan(&tlsConfig).Error
-	if err != nil {
-		return nil, err
+	cfg := db.Get()
+	result := make([]model.Tls, 0, len(cfg.TLS))
+	for _, tls := range cfg.TLS {
+		result = append(result, model.Tls{
+			Id:     tls.Id,
+			Name:   tls.Name,
+			Server: tls.Server,
+			Client: tls.Client,
+		})
 	}
-
-	return tlsConfig, nil
+	return result, nil
 }
 
-func (s *TlsService) Save(tx *gorm.DB, action string, data json.RawMessage, hostname string) error {
-	var err error
+// Save handles CRUD for TLS. tx is ignored in JSON mode.
+func (s *TlsService) Save(tx interface{}, action string, data json.RawMessage, hostname string) error {
+	cfg := db.Get()
 
 	switch action {
 	case "new", "edit":
 		var tls model.Tls
-		err = json.Unmarshal(data, &tls)
-		if err != nil {
+		if err := json.Unmarshal(data, &tls); err != nil {
 			return err
 		}
-		err = tx.Save(&tls).Error
-		if err != nil {
-			return err
+
+		tlsJSON := db.TLS{
+			Id:     tls.Id,
+			Name:   tls.Name,
+			Server: tls.Server,
+			Client: tls.Client,
 		}
 		if action == "edit" {
-			var inbounds []model.Inbound
-			err = tx.Model(model.Inbound{}).Preload("Tls").Where("tls_id = ?", tls.Id).Find(&inbounds).Error
-			if err != nil {
-				return err
+			found := false
+			for i := range cfg.TLS {
+				if cfg.TLS[i].Id == tls.Id {
+					cfg.TLS[i] = tlsJSON
+					found = true
+					break
+				}
 			}
-			if len(inbounds) > 0 {
-				err = s.ClientService.UpdateLinksByInboundChange(tx, &inbounds, hostname, "")
-				if err != nil {
-					return err
+			if !found {
+				cfg.TLS = append(cfg.TLS, tlsJSON)
+			}
+
+			// Find inbounds using this TLS and restart them
+			var inboundIds []uint
+			for _, inb := range cfg.Inbounds {
+				if inb.TlsId == tls.Id {
+					inboundIds = append(inboundIds, inb.Id)
 				}
-				var inboundIds []uint
-				for _, inbound := range inbounds {
-					inboundIds = append(inboundIds, inbound.Id)
-				}
-				err = s.InboundService.UpdateOutJsons(tx, inboundIds, hostname)
+			}
+			if len(inboundIds) > 0 {
+				err := s.InboundService.UpdateOutJsons(nil, inboundIds, hostname)
 				if err != nil {
 					return common.NewError("unable to update out_json of inbounds: ", err.Error())
 				}
-				err = s.InboundService.RestartInbounds(tx, inboundIds)
+				err = s.InboundService.RestartInbounds(nil, inboundIds)
 				if err != nil {
 					return err
 				}
 			}
+
+			// Find services using this TLS
 			var serviceIds []uint
-			err = tx.Model(model.Service{}).Where("tls_id = ?", tls.Id).Scan(&serviceIds).Error
-			if err != nil {
-				return err
+			for _, srv := range cfg.Services {
+				if srv.TlsId == tls.Id {
+					serviceIds = append(serviceIds, srv.Id)
+				}
 			}
 			if len(serviceIds) > 0 {
-				err = s.ServicesService.RestartServices(tx, serviceIds)
+				err := s.ServicesService.RestartServices(nil, serviceIds)
 				if err != nil {
 					return err
 				}
 			}
+
+		} else {
+			maxId := uint(0)
+			for _, t := range cfg.TLS {
+				if t.Id > maxId {
+					maxId = t.Id
+				}
+			}
+			tlsJSON.Id = maxId + 1
+			cfg.TLS = append(cfg.TLS, tlsJSON)
 		}
+		db.Set(cfg)
+		return database.SaveConfig()
+
 	case "del":
 		var id uint
-		err = json.Unmarshal(data, &id)
-		if err != nil {
+		if err := json.Unmarshal(data, &id); err != nil {
 			return err
 		}
-		var inboundCount int64
-		err = tx.Model(model.Inbound{}).Where("tls_id = ?", id).Count(&inboundCount).Error
-		if err != nil {
-			return err
+		inboundCount := 0
+		for _, inb := range cfg.Inbounds {
+			if inb.TlsId == id {
+				inboundCount++
+			}
 		}
-		var serviceCount int64
-		err = tx.Model(model.Service{}).Where("tls_id = ?", id).Count(&serviceCount).Error
-		if err != nil {
-			return err
+		serviceCount := 0
+		for _, srv := range cfg.Services {
+			if srv.TlsId == id {
+				serviceCount++
+			}
 		}
 		if inboundCount > 0 || serviceCount > 0 {
 			return common.NewError("tls in use")
 		}
-		err = tx.Where("id = ?", id).Delete(model.Tls{}).Error
-		if err != nil {
-			return err
+		newTLS := make([]db.TLS, 0, len(cfg.TLS))
+		for _, t := range cfg.TLS {
+			if t.Id != id {
+				newTLS = append(newTLS, t)
+			}
 		}
-	}
+		cfg.TLS = newTLS
+		db.Set(cfg)
+		return database.SaveConfig()
 
-	return nil
+	default:
+		return common.NewErrorf("unknown action: %s", action)
+	}
 }
