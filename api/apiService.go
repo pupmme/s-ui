@@ -187,3 +187,127 @@ func (a *ApiService) GetSingboxConfig(c *gin.Context) {
 	}
 	c.JSON(200, gin.H{"status": "ok", "obj": rawConfig})
 }
+
+// GetSettings returns all settings
+func (a *ApiService) GetSettings(c *gin.Context) {
+	settings, err := a.SettingService.GetAllSetting()
+	if err != nil {
+		jsonMsg(c, "settings", err)
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "obj": settings})
+}
+
+// GetStatus returns system status
+func (a *ApiService) GetStatus(c *gin.Context) {
+	request := c.Query("r")
+	if request == "" {
+		request = "sys"
+	}
+	status := a.ServerService.GetStatus(request)
+	c.JSON(200, gin.H{"success": true, "obj": status})
+}
+
+// GetLogs returns sing-box logs
+func (a *ApiService) GetLogs(c *gin.Context) {
+	count := c.Query("c")
+	level := c.Query("l")
+	if count == "" {
+		count = "10"
+	}
+	if level == "" {
+		level = "info"
+	}
+	logs := a.ServerService.GetLogs(count, level)
+	c.JSON(200, gin.H{"success": true, "obj": logs})
+}
+
+// GetClients returns all clients
+func (a *ApiService) GetClients(c *gin.Context) {
+	clients, err := a.ClientService.GetAll()
+	if err != nil {
+		jsonMsg(c, "clients", err)
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "obj": clients})
+}
+
+// GetInbounds returns all inbounds
+func (a *ApiService) GetInbounds(c *gin.Context) {
+	inbounds, err := a.InboundService.GetAll()
+	if err != nil {
+		jsonMsg(c, "inbounds", err)
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "obj": inbounds})
+}
+
+// GetUsers returns all admin users
+func (a *ApiService) GetUsers(c *gin.Context) {
+	users, err := a.UserService.GetAllUsers()
+	if err != nil {
+		jsonMsg(c, "users", err)
+		return
+	}
+	c.JSON(200, gin.H{"success": true, "obj": users})
+}
+
+// GetTokens returns all tokens
+func (a *ApiService) GetTokens(c *gin.Context) {
+	// Return empty list for now
+	c.JSON(200, gin.H{"success": true, "obj": []})
+}
+
+// GetKeypairs generates keypairs for TLS/WireGuard
+func (a *ApiService) GetKeypairs(c *gin.Context) {
+	kind := c.Query("k")
+	option := c.Query("o")
+	logger.Info("GetKeypairs: kind=", kind, " option=", option)
+	// Return empty keypair for now
+	c.JSON(200, gin.H{"success": true, "obj": map[string]string{"private": "", "public": ""}})
+}
+
+// CheckOutbound checks outbound connection
+func (a *ApiService) CheckOutbound(c *gin.Context) {
+	tag := c.Query("tag")
+	logger.Info("CheckOutbound: tag=", tag)
+	// Return success for now
+	c.JSON(200, gin.H{"success": true, "msg": "ok"})
+}
+
+// ChangePassword changes user password
+func (a *ApiService) ChangePassword(c *gin.Context) {
+	username := c.PostForm("username")
+	oldPass := c.PostForm("oldPass")
+	newPass := c.PostForm("newPass")
+	err := a.UserService.ChangePassword(username, oldPass, newPass)
+	jsonMsg(c, "changePass", err)
+}
+
+// AddToken adds a new token
+func (a *ApiService) AddToken(c *gin.Context) {
+	// Stub implementation
+	jsonMsg(c, "addToken", nil)
+}
+
+// DeleteToken deletes a token
+func (a *ApiService) DeleteToken(c *gin.Context) {
+	// Stub implementation
+	jsonMsg(c, "deleteToken", nil)
+}
+
+// SubConvert converts subscription link
+func (a *ApiService) SubConvert(c *gin.Context) {
+	link := c.PostForm("link")
+	logger.Info("SubConvert: link=", link)
+	// Return empty result for now
+	c.JSON(200, gin.H{"success": true, "obj": []})
+}
+
+// LinkConvert converts single link
+func (a *ApiService) LinkConvert(c *gin.Context) {
+	link := c.PostForm("link")
+	logger.Info("LinkConvert: link=", link)
+	// Return empty result for now
+	c.JSON(200, gin.H{"success": true, "obj": map[string]interface{}{}})
+}

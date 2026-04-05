@@ -50,6 +50,16 @@ func (a *APIHandler) postHandler(c *gin.Context) {
 		a.ApiService.RestartApp(c)
 	case "restartSb":
 		a.ApiService.RestartSb(c)
+	case "changePass":
+		a.ApiService.ChangePassword(c)
+	case "addToken":
+		a.ApiService.AddToken(c)
+	case "deleteToken":
+		a.ApiService.DeleteToken(c)
+	case "subConvert":
+		a.ApiService.SubConvert(c)
+	case "linkConvert":
+		a.ApiService.LinkConvert(c)
 	default:
 		fmt.Println("unknown action: " + action)
 	}
@@ -62,6 +72,24 @@ func (a *APIHandler) getHandler(c *gin.Context) {
 		a.ApiService.GetSingboxConfig(c)
 	case "load", "loadData":
 		a.ApiService.LoadData(c)
+	case "settings":
+		a.ApiService.GetSettings(c)
+	case "status":
+		a.ApiService.GetStatus(c)
+	case "logs":
+		a.ApiService.GetLogs(c)
+	case "clients":
+		a.ApiService.GetClients(c)
+	case "inbounds":
+		a.ApiService.GetInbounds(c)
+	case "users":
+		a.ApiService.GetUsers(c)
+	case "tokens":
+		a.ApiService.GetTokens(c)
+	case "keypairs":
+		a.ApiService.GetKeypairs(c)
+	case "checkOutbound":
+		a.ApiService.CheckOutbound(c)
 	default:
 		fmt.Println("unknown action: " + action)
 	}

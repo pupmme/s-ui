@@ -135,6 +135,25 @@ func (s *UserService) ChangePass(id string, oldPass string, newUser string, newP
 	return common.NewError("user not found or wrong password")
 }
 
+// GetAllUsers returns all users (alias for GetUsers)
+func (s *UserService) GetAllUsers() (*[]db.User, error) {
+	return s.GetUsers()
+}
+
+// ChangePassword changes password for a user
+func (s *UserService) ChangePassword(username string, oldPass string, newPass string) error {
+	cfg := db.Get()
+	for i := range cfg.Users {
+		u := &cfg.Users[i]
+		if u.Username == username && u.Password == oldPass {
+			u.Password = newPass
+			db.Set(cfg)
+			return db.SaveConfig()
+		}
+	}
+	return common.NewError("user not found or wrong password")
+}
+
 func (s *UserService) LoadTokens() ([]byte, error) {
 	return []byte("[]"), nil // Token功能已禁用
 }
