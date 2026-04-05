@@ -127,6 +127,9 @@ func (s *InboundService) FromIds(ids []uint) ([]*db.Inbound, error) {
 
 // Save handles CRUD for inbounds. tx parameter is ignored in JSON mode.
 func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, initUserIds string, hostname string) error {
+	if s.ClientService.IsNodeMode() {
+		return common.NewError("inbounds are read-only in node mode")
+	}
 	cfg := db.Get()
 
 	switch act {
@@ -225,12 +228,12 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 		}
 
 		if act == "new" {
-			err := s.ClientService.UpdateClientsOnInboundAddJSON(initUserIds, inbJSON.Id, hostname)
+			err := s.ClientService.UpdateClientsOnInboundAdd(initUserIds, inbJSON.Id, hostname)
 			if err != nil {
 				return err
 			}
 		} else {
-			err := s.ClientService.UpdateLinksByInboundChangeJSON(inbJSON, oldTag, hostname)
+			err := s.ClientService.UpdateLinksByInboundChange(inbJSON, oldTag, hostname)
 			if err != nil {
 				return err
 			}
@@ -253,7 +256,7 @@ func (s *InboundService) Save(tx interface{}, act string, data json.RawMessage, 
 				break
 			}
 		}
-		if err := s.ClientService.UpdateClientsOnInboundDeleteJSON(id, tag); err != nil {
+		if err := s.ClientService.UpdateClientsOnInboundDelete(id, tag); err != nil {
 			return err
 		}
 		newInbounds := make([]db.Inbound, 0, len(cfg.Inbounds))

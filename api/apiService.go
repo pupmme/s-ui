@@ -24,6 +24,7 @@ type ApiService struct {
 	service.ServicesService
 	service.StatsService
 	service.PanelService
+	service.SettingService
 	service.ServerService
 }
 
@@ -284,7 +285,7 @@ func (a *ApiService) GetUsers(c *gin.Context) {
 // GetTokens returns all tokens
 func (a *ApiService) GetTokens(c *gin.Context) {
 	// Return empty list for now
-	c.JSON(200, gin.H{"success": true, "obj": []})
+	c.JSON(200, gin.H{"success": true, "obj": []interface{}{}})
 }
 
 // GetKeypairs generates keypairs for TLS/WireGuard
@@ -330,7 +331,7 @@ func (a *ApiService) SubConvert(c *gin.Context) {
 	link := c.PostForm("link")
 	logger.Info("SubConvert: link=", link)
 	// Return empty result for now
-	c.JSON(200, gin.H{"success": true, "obj": []})
+	c.JSON(200, gin.H{"success": true, "obj": []interface{}{}})
 }
 
 // LinkConvert converts single link
