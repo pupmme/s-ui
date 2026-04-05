@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/json"
-	"strconv"
 	"strings"
 
 	"github.com/pupmme/sub/config"
@@ -200,33 +199,55 @@ func (a *ApiService) GetSettings(c *gin.Context) {
 	c.JSON(200, gin.H{"success": true, "obj": settings})
 }
 
-// GetNodeMode returns the current node mode setting
+// GetNodeMode returns the current node mode setting (reads from config.json)
 func (a *ApiService) GetNodeMode(c *gin.Context) {
 	nodeMode, _ := a.SettingService.GetNodeMode()
 	xboardApiHost, _ := a.SettingService.GetXboardApiHost()
 	xboardApiKey, _ := a.SettingService.GetXboardApiKey()
+	nodeId, _ := a.SettingService.GetNodeID()
+	nodeType, _ := a.SettingService.GetNodeType()
 	c.JSON(200, gin.H{
 		"success": true,
 		"obj": gin.H{
 			"nodeMode":      nodeMode,
 			"xboardApiHost": xboardApiHost,
 			"xboardApiKey":  xboardApiKey,
+			"nodeId":        nodeId,
+			"nodeType":      nodeType,
 		},
 	})
 }
 
-// SetNodeMode sets the node mode and xboard config
+// SetNodeMode saves node mode and xboard config to config.json
 func (a *ApiService) SetNodeMode(c *gin.Context) {
-	nodeMode, _ := strconv.ParseBool(c.PostForm("nodeMode"))
-	xboardApiHost := c.PostForm("xboardApiHost")
-	xboardApiKey := c.PostForm("xboardApiKey")
+	var data map[string]interface{}
+	if err := json.NewDecoder(c.Request.Body).Decode(&data); err != nil {
+		jsonMsg(c, "nodeMode", common.NewError("invalid JSON: "+err.Error()))
+		return
+	}
 
-	a.SettingService.SetNodeMode(nodeMode)
-	a.SettingService.SetXboardApiHost(xboardApiHost)
-	a.SettingService.SetXboardApiKey(xboardApiKey)
+	if v, ok := data["nodeMode"]; ok {
+		a.SettingService.SetNodeMode(toBool(v))
+	}
+	if v, ok := data["xboardApiHost"]; ok {
+		a.SettingService.SetXboardApiHost(toString(v))
+	}
+	if v, ok := data["xboardApiKey"]; ok {
+		a.SettingService.SetXboardApiKey(toString(v))
+	}
+	if v, ok := data["nodeId"]; ok {
+		a.SettingService.SetNodeID(toInt(v))
+	}
+	if v, ok := data["nodeType"]; ok {
+		a.SettingService.SetNodeType(toString(v))
+	}
 
 	jsonMsg(c, "nodeMode", nil)
 }
+
+func toString(v interface{}) string { if s, ok := v.(string); ok { return s }; return "" }
+func toBool(v interface{}) bool { if b, ok := v.(bool); ok { return b }; return false }
+func toInt(v interface{}) int { if f, ok := v.(float64); ok { return int(f) }; return 0 }
 
 // GetStatus returns system status
 func (a *ApiService) GetStatus(c *gin.Context) {

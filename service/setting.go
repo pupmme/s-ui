@@ -1,9 +1,10 @@
 	package service
 
 import (
+	"github.com/pupmme/sub/config"
+	"github.com/pupmme/sub/db"
 	"github.com/pupmme/sub/logger"
 	"github.com/pupmme/sub/util/common"
-	"github.com/pupmme/sub/db"
 	"encoding/json"
 	"os"
 	"runtime"
@@ -214,29 +215,60 @@ func (s *SettingService) GetTrafficAge() (int, error) {
 	return s.getInt("trafficAge")
 }
 
-// Node mode settings
+// Node mode settings — read/write config.json
 func (s *SettingService) GetNodeMode() (bool, error) {
-	return s.getBool("nodeMode")
+	return config.Get().Node, nil
 }
 
 func (s *SettingService) SetNodeMode(enabled bool) error {
-	return s.setString("nodeMode", strconv.FormatBool(enabled))
+	cfg := config.Get()
+	cfg.Node = enabled
+	config.Set(cfg)
+	return config.Save()
 }
 
 func (s *SettingService) GetXboardApiHost() (string, error) {
-	return s.getString("xboardApiHost")
+	return config.Get().Xboard.ApiHost, nil
 }
 
 func (s *SettingService) SetXboardApiHost(host string) error {
-	return s.setString("xboardApiHost", host)
+	cfg := config.Get()
+	cfg.Xboard.ApiHost = host
+	config.Set(cfg)
+	return config.Save()
 }
 
 func (s *SettingService) GetXboardApiKey() (string, error) {
-	return s.getString("xboardApiKey")
+	return config.Get().Xboard.ApiKey, nil
 }
 
 func (s *SettingService) SetXboardApiKey(key string) error {
-	return s.setString("xboardApiKey", key)
+	cfg := config.Get()
+	cfg.Xboard.ApiKey = key
+	config.Set(cfg)
+	return config.Save()
+}
+
+func (s *SettingService) GetNodeID() (int, error) {
+	return config.Get().Xboard.NodeID, nil
+}
+
+func (s *SettingService) SetNodeID(id int) error {
+	cfg := config.Get()
+	cfg.Xboard.NodeID = id
+	config.Set(cfg)
+	return config.Save()
+}
+
+func (s *SettingService) GetNodeType() (string, error) {
+	return config.Get().Xboard.NodeType, nil
+}
+
+func (s *SettingService) SetNodeType(nodeType string) error {
+	cfg := config.Get()
+	cfg.Xboard.NodeType = nodeType
+	config.Set(cfg)
+	return config.Save()
 }
 
 func (s *SettingService) GetTimeLocation() (*time.Location, error) {

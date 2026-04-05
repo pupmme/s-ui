@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/pupmme/sub/config"
 	"github.com/pupmme/sub/db"
 	"github.com/pupmme/sub/logger"
 	"github.com/pupmme/sub/util/common"
@@ -52,7 +53,7 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 
 // IsNodeMode returns true when s-ui is acting as a node proxy to xboard.
 func (s *ClientService) IsNodeMode() bool {
-	return false // actual check delegated to config.Node in app context
+	return config.Get().Node
 }
 
 // UpdateClientsOnInboundAdd is a stub — inbound write logic lives in InboundService.

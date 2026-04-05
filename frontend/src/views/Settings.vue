@@ -106,6 +106,23 @@
                   hide-details
                 ></v-text-field>
               </v-col>
+              <v-col cols="12" sm="6" md="4">
+                <v-text-field
+                  v-model="settings.nodeId"
+                  :label="$t('setting.nodeId')"
+                  placeholder="1"
+                  type="number"
+                  hide-details
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="6" md="4">
+                <v-select
+                  v-model="settings.nodeType"
+                  :label="$t('setting.nodeType')"
+                  :items="['sing-box', 'xray', 'v2ray', 'shadowsocks', 'custom']"
+                  hide-details
+                ></v-select>
+              </v-col>
             </v-row>
           </div>
         </v-expand-transition>
@@ -154,6 +171,8 @@ const settings = ref({
   nodeMode: "false",
   xboardApiHost: "",
   xboardApiKey: "",
+  nodeId: 0,
+  nodeType: "sing-box",
 })
 
 onMounted(async () => {
@@ -164,28 +183,51 @@ onMounted(async () => {
 
 const loadData = async () => {
   loading.value = true
-  const msg = await HttpUtils.get('api/settings')
+  const [settingsMsg, nodeMsg] = await Promise.all([
+    HttpUtils.get('api/settings'),
+    HttpUtils.get('api/getNodeMode'),
+  ])
   loading.value = false
-  if (msg.success) {
-    setData(msg.obj)
+  if (settingsMsg.success) {
+    setData(settingsMsg.obj)
   }
+  if (nodeMsg.success) {
+    settings.value.nodeMode = nodeMsg.obj.nodeMode
+    settings.value.xboardApiHost = nodeMsg.obj.xboardApiHost || ''
+    settings.value.xboardApiKey = nodeMsg.obj.xboardApiKey || ''
+    settings.value.nodeId = nodeMsg.obj.nodeId || 0
+    settings.value.nodeType = nodeMsg.obj.nodeType || 'sing-box'
+  }
+  oldSettings.value = { ...settings.value }
 }
 
 const setData = (data: any) => {
-  settings.value = data
-  oldSettings.value = { ...data }
+  settings.value = { ...settings.value, ...data }
 }
 
 const save = async () => {
   loading.value = true
-  const msg = await HttpUtils.post('api/save', { object: 'settings', action: 'set', data: JSON.stringify(settings.value) })
+  // Separate node/config fields from panel settings
+  const nodeFields = ['nodeMode', 'xboardApiHost', 'xboardApiKey', 'nodeId', 'nodeType']
+  const nodeData: any = {}
+  const panelData: any = {}
+  for (const [k, v] of Object.entries(settings.value)) {
+    if (nodeFields.includes(k)) nodeData[k] = v
+    else panelData[k] = v
+  }
+  // Save node config first
+  if (Object.keys(nodeData).length > 0) {
+    await HttpUtils.post('api/setNodeMode', nodeData)
+  }
+  // Save panel settings
+  const msg = await HttpUtils.post('api/save', { object: 'settings', action: 'set', data: JSON.stringify(panelData) })
   if (msg.success) {
     push.success({
       title: i18n.global.t('success'),
       duration: 5000,
       message: i18n.global.t('actions.set') + " " + i18n.global.t('pages.settings')
     })
-    setData(msg.obj.settings)
+    if (msg.obj && msg.obj.settings) setData(msg.obj.settings)
   }
   loading.value = false
 }
@@ -258,8 +300,8 @@ const subUpdates = computed({
 })
 
 const nodeMode = computed({
-  get: () => { return settings.value.nodeMode == "true" },
-  set: (v:boolean) => { settings.value.nodeMode = v ? "true" : "false" }
+  get: () => !!settings.value.nodeMode,
+  set: (v:boolean) => { settings.value.nodeMode = v }
 })
 
 const stateChange = computed(() => {

@@ -199,6 +199,8 @@ export default {
     nodeMode: "Node 模式",
     xboardApiHost: "Xboard API 地址",
     xboardApiKey: "Xboard API 密钥",
+    nodeId: "节点 ID",
+    nodeType: "节点类型",
   },
   client: {
     name: "名称",
