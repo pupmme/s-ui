@@ -15,6 +15,8 @@ import (
 var (
 	configPath = "/etc/sub/config.json"
 	dataPath   = "/etc/sub/singbox.json"
+	coreServiceInstance *service.Core
+	xboardDaemonInstance *service.XboardDaemon
 )
 
 func Start() error {
@@ -39,9 +41,15 @@ func startWithPaths(cfgPath, dPath string) error {
 		logger.Error("load db: ", err)
 	}
 
-	coreSvc := service.NewCore()
-	if err := coreSvc.Start(); err != nil {
+	coreServiceInstance = service.NewCore()
+	if err := coreServiceInstance.Start(); err != nil {
 		logger.Error("start core: ", err)
+	}
+
+	// Start xboard daemon if node mode is enabled
+	if config.Get().Node {
+		xboardDaemonInstance = service.NewXboardDaemon()
+		xboardDaemonInstance.Start()
 	}
 
 	webServer := web.NewServer()
@@ -56,7 +64,10 @@ func startWithPaths(cfgPath, dPath string) error {
 	<-ch
 
 	logger.Info("shutting down...")
-	coreSvc.Close()
+	if xboardDaemonInstance != nil {
+		xboardDaemonInstance.Stop()
+	}
+	coreServiceInstance.Close()
 	webServer.Stop()
 	return nil
 }

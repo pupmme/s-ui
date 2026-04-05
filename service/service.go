@@ -48,6 +48,32 @@ func (c *Core) Close() {
 	}
 }
 
+func (c *Core) Restart() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	core.GetCore().Stop()
+	c.started = false
+	if err := config.Load(); err != nil {
+		logger.Warning("reload config: ", err)
+	}
+	if err := db.Load(db.DataPath()); err != nil {
+		logger.Warning("reload db: ", err)
+	}
+	data, err := buildSingboxConfig()
+	if err != nil {
+		return err
+	}
+	c.started = true
+	return core.GetCore().Start(data)
+}
+
+var coreServiceInstance *Core
+
+// GetCoreService returns the global CoreService instance.
+func GetCoreService() *Core {
+	return coreServiceInstance
+}
+
 func (c *Core) GetInstance() *core.Core {
 	return core.GetCore()
 }
