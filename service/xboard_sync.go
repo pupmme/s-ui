@@ -21,47 +21,91 @@ func NewXboardSync(client *network.XboardClient) *XboardSync {
 }
 
 // Sync performs config + user sync. Pass initial=true to also do handshake.
+// Uses Config/Users from handshake response when available to avoid extra round-trips.
 func (s *XboardSync) Sync(initial bool) error {
+	var hs *network.HandshakeResponse
+
 	if initial {
 		cfg := config.Get()
 		if !cfg.Node {
 			return fmt.Errorf("sync is only available in node mode")
 		}
-		hs, err := s.client.Handshake()
+		var err error
+		hs, err = s.client.Handshake()
 		if err != nil {
 			return fmt.Errorf("handshake failed: %w", err)
 		}
 		logger.Info("[xboard-sync] connected to xboard ", hs.Version)
-	} else {
-		logger.Debug("[xboard-sync] incremental sync")
 	}
 
-	// Get latest inbound config
-	nodeCfg, err := s.client.GetConfig()
-	if err != nil {
-		logger.Info("[xboard-sync] get config: ", err)
-	} else if nodeCfg != nil {
-		if err := s.applyInboundConfig(nodeCfg); err != nil {
-			logger.Error("[xboard-sync] apply inbound config: ", err)
+	// Apply config from handshake response if available (avoids extra round-trip)
+	if hs != nil && len(hs.Config) > 0 {
+		if err := s.applyInboundConfigRaw(hs.Config); err != nil {
+			logger.Error("[xboard-sync] apply inbound config from handshake: ", err)
 		} else {
-			logger.Info("[xboard-sync] inbound config applied")
+			logger.Info("[xboard-sync] inbound config applied from handshake")
+		}
+	} else {
+		// Fallback: explicit fetch
+		nodeCfg, err := s.client.GetConfig()
+		if err != nil {
+			logger.Info("[xboard-sync] get config: ", err)
+		} else if nodeCfg != nil {
+			if err := s.applyInboundConfig(nodeCfg); err != nil {
+				logger.Error("[xboard-sync] apply inbound config: ", err)
+			} else {
+				logger.Info("[xboard-sync] inbound config applied")
+			}
 		}
 	}
 
-	// Get latest users
-	users, err := s.client.GetUsers()
-	if err != nil {
-		logger.Info("[xboard-sync] get users: ", err)
-	} else if users != nil {
-		if err := s.applyUsers(users); err != nil {
-			logger.Error("[xboard-sync] apply users: ", err)
+	// Apply users from handshake response if available
+	if hs != nil && len(hs.Users) > 0 {
+		if err := s.applyUsersRaw(hs.Users); err != nil {
+			logger.Error("[xboard-sync] apply users from handshake: ", err)
 		} else {
-			logger.Info("[xboard-sync] ", len(users), " users applied")
+			logger.Info("[xboard-sync] users applied from handshake")
+		}
+	} else {
+		// Fallback: explicit fetch
+		users, err := s.client.GetUsers()
+		if err != nil {
+			logger.Info("[xboard-sync] get users: ", err)
+		} else if users != nil {
+			if err := s.applyUsers(users); err != nil {
+				logger.Error("[xboard-sync] apply users: ", err)
+			} else {
+				logger.Info("[xboard-sync] ", len(users), " users applied")
+			}
 		}
 	}
 
 	logger.Info("[xboard-sync] sync completed")
 	return nil
+}
+
+// applyInboundConfigRaw parses raw config JSON from handshake and applies it.
+func (s *XboardSync) applyInboundConfigRaw(raw json.RawMessage) error {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var cfg network.NodeConfig
+	if err := json.Unmarshal(raw, &cfg); err != nil {
+		return fmt.Errorf("parse config: %w", err)
+	}
+	return s.applyInboundConfig(&cfg)
+}
+
+// applyUsersRaw parses raw users JSON array from handshake and applies it.
+func (s *XboardSync) applyUsersRaw(raw json.RawMessage) error {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil
+	}
+	var users []network.User
+	if err := json.Unmarshal(raw, &users); err != nil {
+		return fmt.Errorf("parse users: %w", err)
+	}
+	return s.applyUsers(users)
 }
 
 // applyInboundConfig applies the inbound configuration from xboard to local db.
