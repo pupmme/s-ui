@@ -9,16 +9,20 @@ import (
 
 var syncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "Manually sync from xboard (node mode)",
+	Short: "Sync node data from xboard (node mode)",
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg := config.Get()
 		if !cfg.Node {
-			logger.Error("not in node mode, sync is only available in node mode")
+			logger.Error("sync is only available in node mode")
 			return
 		}
-		logger.Info("syncing from xboard...")
-		// TODO: implement xboard sync
+		sync := service.NewXboardSync()
+		if err := sync.DoFullSync(); err != nil {
+			logger.Error("sync failed: ", err)
+			return
+		}
 		logger.Info("sync completed")
+		// Reload core with new config
 		_ = service.NewCore()
 	},
 }

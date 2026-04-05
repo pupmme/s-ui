@@ -1,0 +1,177 @@
+package service
+
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/pupmme/sub/config"
+	"github.com/pupmme/sub/db"
+	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/network"
+)
+
+// XboardSync handles data synchronization between s-ui (node) and xboard (server).
+type XboardSync struct {
+	client *network.XboardClient
+}
+
+// NewXboardSync creates a new sync service.
+func NewXboardSync() *XboardSync {
+	return &XboardSync{
+		client: network.NewXboardClient(),
+	}
+}
+
+// DoFullSync performs a complete sync: handshake + config + users.
+func (s *XboardSync) DoFullSync() error {
+	cfg := config.Get()
+	if !cfg.Node {
+		return fmt.Errorf("sync is only available in node mode")
+	}
+
+	logger.Info("[xboard-sync] starting full sync...")
+
+	// Step 1: Handshake — register node with xboard
+	hs, err := s.client.Handshake()
+	if err != nil {
+		return fmt.Errorf("handshake failed: %w", err)
+	}
+	logger.Info("[xboard-sync] connected to xboard ", hs.Version)
+
+	// Step 2: Get latest inbound config
+	nodeCfg, err := s.client.GetConfig()
+	if err != nil {
+		logger.Info("[xboard-sync] get config: ", err)
+	} else if nodeCfg != nil {
+		if err := s.applyInboundConfig(nodeCfg); err != nil {
+			logger.Error("[xboard-sync] apply inbound config: ", err)
+		} else {
+			logger.Info("[xboard-sync] inbound config applied")
+		}
+	}
+
+	// Step 3: Get latest users
+	users, err := s.client.GetUsers()
+	if err != nil {
+		logger.Info("[xboard-sync] get users: ", err)
+	} else if users != nil {
+		if err := s.applyUsers(users); err != nil {
+			logger.Error("[xboard-sync] apply users: ", err)
+		} else {
+			logger.Info("[xboard-sync] ", len(users), " users applied")
+		}
+	}
+
+	logger.Info("[xboard-sync] full sync completed")
+	return nil
+}
+
+// applyInboundConfig applies the inbound configuration from xboard to local db.
+func (s *XboardSync) applyInboundConfig(nodeCfg *network.NodeConfig) error {
+	cfg := db.Get()
+
+	// Find or create inbound matching this tag
+	var target *db.Inbound
+	for i := range cfg.Inbounds {
+		if cfg.Inbounds[i].Tag == nodeCfg.Tag {
+			target = &cfg.Inbounds[i]
+			break
+		}
+	}
+	if target == nil {
+		// Create new inbound
+		newID := uint(1)
+		for _, ib := range cfg.Inbounds {
+			if ib.Id >= newID {
+				newID = ib.Id + 1
+			}
+		}
+		listen := "0.0.0.0"
+		if nodeCfg.Listen != "" {
+			listen = nodeCfg.Listen
+		}
+		cfg.Inbounds = append(cfg.Inbounds, db.Inbound{
+			Id:     newID,
+			Type:   nodeCfg.Protocol,
+			Tag:    nodeCfg.Tag,
+			Addrs:  []byte(fmt.Sprintf(`["%s"]`, listen)),
+			OutJson: nodeCfg.Settings,
+		})
+		logger.Info("[xboard-sync] created inbound: ", nodeCfg.Tag)
+	} else {
+		// Update existing
+		if nodeCfg.Listen != "" {
+			cfg.Inbounds[target.Id].Addrs = []byte(fmt.Sprintf(`["%s"]`, nodeCfg.Listen))
+		}
+		cfg.Inbounds[target.Id].OutJson = nodeCfg.Settings
+		logger.Info("[xboard-sync] updated inbound: ", nodeCfg.Tag)
+	}
+
+	db.Set(cfg)
+	return db.SaveConfig()
+}
+
+// applyUsers applies the user list from xboard to local db.
+// In node mode, users are managed by xboard — we mirror them locally.
+func (s *XboardSync) applyUsers(users []network.User) error {
+	cfg := db.Get()
+
+	for _, u := range users {
+		// Build xboard metadata stored in Config JSON
+		meta := map[string]interface{}{
+			"uuid":   u.UUID,
+			"email":  u.Email,
+			"flow":   u.Flow,
+			"tg_id":  u.TgId,
+			"sub_id": u.SubID,
+		}
+		metaJSON, _ := json.Marshal(meta)
+
+		// Build description for display
+		desc := u.Email
+		if desc == "" {
+			desc = fmt.Sprintf("xboard:%s", u.Username)
+		}
+
+		found := false
+		for i := range cfg.Clients {
+			if int64(cfg.Clients[i].Id) == u.ID {
+				// Update existing user
+				cfg.Clients[i].Enable = u.Enable
+				cfg.Clients[i].Up = u.Upload
+				cfg.Clients[i].Down = u.Download
+				cfg.Clients[i].Volume = u.Total
+				cfg.Clients[i].Expiry = u.ExpiryTime
+				cfg.Clients[i].Desc = desc
+				cfg.Clients[i].Config = metaJSON
+				found = true
+				logger.Debug("[xboard-sync] updated user: ", u.Username)
+				break
+			}
+		}
+		if !found {
+			// Create new client
+			cfg.Clients = append(cfg.Clients, db.Client{
+				Id:       uint(u.ID),
+				Name:     u.Username,
+			Enable:   u.Enable,
+				Up:       u.Upload,
+				Down:     u.Download,
+				Volume:   u.Total,
+				Expiry:   u.ExpiryTime,
+				Desc:     desc,
+				Config:   metaJSON,
+				Inbounds: []byte("[]"),
+			})
+			logger.Debug("[xboard-sync] added user: ", u.Username)
+		}
+	}
+
+	db.Set(cfg)
+	return db.SaveConfig()
+}
+
+// ReportTraffic sends traffic data to xboard.
+func (s *XboardSync) ReportTraffic(traffic map[int64][2]int64) error {
+	return s.client.Report(traffic, nil, nil, 0, [2]uint64{}, [2]uint64{}, [2]uint64{})
+}
