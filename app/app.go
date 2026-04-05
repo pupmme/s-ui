@@ -3,9 +3,12 @@ package app
 import (
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/pupmme/sub/config"
+	"github.com/pupmme/sub/cronjob"
 	"github.com/pupmme/sub/db"
 	"github.com/pupmme/sub/logger"
 	"github.com/pupmme/sub/service"
@@ -17,6 +20,7 @@ var (
 	dataPath   = "/etc/sub/singbox.json"
 	coreServiceInstance *service.Core
 	xboardDaemonInstance *service.XboardDaemon
+	cronJob             *cronjob.CronJob
 )
 
 func Start() error {
@@ -52,6 +56,26 @@ func startWithPaths(cfgPath, dPath string) error {
 		xboardDaemonInstance.Start()
 	}
 
+	// Start cron jobs for traffic cleanup and core health
+	settings := db.Get().Settings
+	tz := settings["timeLoc"]
+	if tz == "" {
+		tz = "Asia/Shanghai"
+	}
+	loc, _ := time.LoadLocation(tz)
+	trafficAge := 0
+	if v, ok := settings["trafficAge"]; ok {
+		if n, err := strconv.Atoi(v); err == nil {
+			trafficAge = n
+		}
+	}
+	cronJob = cronjob.NewCronJob()
+	if err := cronJob.Start(loc, trafficAge); err != nil {
+		logger.Error("start cron: ", err)
+	} else {
+		logger.Info("cron started")
+	}
+
 	webServer := web.NewServer()
 	if err := webServer.Start(); err != nil {
 		logger.Error("start web server: ", err)
@@ -66,6 +90,9 @@ func startWithPaths(cfgPath, dPath string) error {
 	logger.Info("shutting down...")
 	if xboardDaemonInstance != nil {
 		xboardDaemonInstance.Stop()
+	}
+	if cronJob != nil {
+		cronJob.Stop()
 	}
 	coreServiceInstance.Close()
 	webServer.Stop()

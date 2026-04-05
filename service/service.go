@@ -16,7 +16,8 @@ type Core struct {
 }
 
 func NewCore() *Core {
-	return &Core{}
+	coreServiceInstance = &Core{}
+	return coreServiceInstance
 }
 
 func (c *Core) Start() error {
@@ -72,6 +73,10 @@ var coreServiceInstance *Core
 // GetCoreService returns the global CoreService instance.
 func GetCoreService() *Core {
 	return coreServiceInstance
+}
+
+func (c *Core) IsRunning() bool {
+	return core.GetCore().IsRunning()
 }
 
 func (c *Core) GetInstance() *core.Core {

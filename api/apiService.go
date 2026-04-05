@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/pupmme/sub/config"
 	"github.com/pupmme/sub/logger"
@@ -109,7 +110,7 @@ func (a *ApiService) Login(c *gin.Context) {
 
 	username = strings.TrimSpace(username)
 	password = strings.TrimSpace(password)
-	logger.Infof("LOGIN: ct=%q user=%q pass=%q", ct, username, password)
+	logger.Infof("LOGIN: ct=%q user=%q", ct, username)
 
 	if username == "" || password == "" {
 		jsonMsg(c, "login", common.NewError("username or password is empty"))
@@ -161,7 +162,7 @@ func (a *ApiService) Save(c *gin.Context) {
 }
 
 func (a *ApiService) RestartApp(c *gin.Context) {
-	err := a.PanelService.RestartPanel(3)
+	err := a.PanelService.RestartPanel(3 * time.Second)
 	jsonMsg(c, "restartApp", err)
 }
 

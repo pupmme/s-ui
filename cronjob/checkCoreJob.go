@@ -1,7 +1,7 @@
 package cronjob
 
 import (
-	"github.com/pupmme/sub/core"
+	"github.com/pupmme/sub/service"
 )
 
 type CheckCoreJob struct{}
@@ -11,8 +11,11 @@ func NewCheckCoreJob() *CheckCoreJob {
 }
 
 func (s *CheckCoreJob) Run() {
-	c := core.GetCore()
-	if c != nil && !c.IsRunning() {
-		_ = c.Start(nil)
+	c := service.GetCoreService()
+	if c == nil {
+		return
+	}
+	if !c.IsRunning() {
+		_ = c.Restart()
 	}
 }

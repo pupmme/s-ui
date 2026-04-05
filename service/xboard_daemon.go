@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"runtime"
 	"sync"
@@ -18,23 +17,28 @@ import (
 // XboardDaemon runs as a background goroutine, handling all xboard communication.
 // It replaces xboard-node entirely — s-ui manages itself as a xboard sub-node.
 type XboardDaemon struct {
-	client   *network.XboardClient
-	syncSvc  *XboardSync
-	ctx      context.Context
-	cancel   context.CancelFunc
-	wg       sync.WaitGroup
+	client  *network.XboardClient
+	syncSvc *XboardSync
+	ctx     context.Context
+	cancel  context.CancelFunc
+	wg      sync.WaitGroup
 
 	syncMu      sync.Mutex
 	lastSync    time.Time
 	lastTraffic time.Time
 	connected   bool
+
+	// Per-user last seen traffic for delta computation
+	lastTrafficSnap map[int64][2]int64
 }
 
 // NewXboardDaemon creates the daemon (does not start it).
 func NewXboardDaemon() *XboardDaemon {
+	client := network.NewXboardClient()
 	return &XboardDaemon{
-		client:  network.NewXboardClient(),
-		syncSvc: NewXboardSync(),
+		client:           client,
+		syncSvc:          NewXboardSync(client),
+		lastTrafficSnap: make(map[int64][2]int64),
 	}
 }
 
@@ -103,12 +107,11 @@ func (d *XboardDaemon) doHandshake() {
 		if err == nil {
 			d.connected = true
 			logger.Info("[xboard-daemon] handshake ok, xboard version: ", hs.Version)
-			if err := d.syncSvc.DoFullSync(); err != nil {
+			if err := d.syncSvc.Sync(false); err != nil {
 				logger.Error("[xboard-daemon] initial sync failed: ", err)
 			}
-			// Reload core with new config
-			if c := core.GetCore(); c != nil {
-				GetCoreService().Restart()
+			if c := GetCoreService(); c != nil {
+				_ = c.Restart()
 			}
 			return
 		}
@@ -125,7 +128,6 @@ func (d *XboardDaemon) syncLoop() {
 	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 
-	// Retry handshake on disconnect
 	for {
 		select {
 		case <-d.ctx.Done():
@@ -181,11 +183,6 @@ func (d *XboardDaemon) doSync() {
 	d.syncMu.Lock()
 	defer d.syncMu.Unlock()
 
-	cfg := config.Get()
-	if !cfg.Node {
-		return
-	}
-
 	// Get config updates
 	nodeCfg, err := d.client.GetConfig()
 	if err != nil {
@@ -197,8 +194,8 @@ func (d *XboardDaemon) doSync() {
 			logger.Error("[xboard-daemon] apply inbound config: ", err)
 		} else {
 			logger.Debug("[xboard-daemon] inbound config updated, reloading core")
-			if c := core.GetCore(); c != nil {
-				GetCoreService().Restart()
+			if c := GetCoreService(); c != nil {
+				_ = c.Restart()
 			}
 		}
 	}
@@ -218,7 +215,7 @@ func (d *XboardDaemon) doSync() {
 	d.lastSync = time.Now()
 }
 
-// pushTraffic collects current traffic stats and sends to xboard.
+// pushTraffic collects current traffic stats, computes delta, and sends to xboard.
 func (d *XboardDaemon) pushTraffic() {
 	box := core.GetCore()
 	if box == nil || !box.IsRunning() {
@@ -228,18 +225,23 @@ func (d *XboardDaemon) pushTraffic() {
 	statsSvc := &StatsService{}
 	if err := statsSvc.SaveStats(false); err != nil {
 		logger.Debug("[xboard-daemon] save stats: ", err)
-		return
 	}
 
-	// Collect traffic from db clients (updated by SaveStats)
 	cfg := db.Get()
-	traffic := make(map[int64][2]int64)
+	delta := make(map[int64][2]int64)
 	for _, c := range cfg.Clients {
-		traffic[int64(c.Id)] = [2]int64{c.Up, c.Down}
+		last, ok := d.lastTrafficSnap[int64(c.Id)]
+		if ok {
+			delta[int64(c.Id)] = [2]int64{c.Up - last[0], c.Down - last[1]}
+		} else {
+			// First report — establish baseline with zero delta
+			delta[int64(c.Id)] = [2]int64{0, 0}
+		}
+		d.lastTrafficSnap[int64(c.Id)] = [2]int64{c.Up, c.Down}
 	}
 
-	if len(traffic) > 0 {
-		if err := d.syncSvc.ReportTraffic(traffic); err != nil {
+	if len(delta) > 0 {
+		if err := d.syncSvc.ReportTraffic(delta); err != nil {
 			logger.Debug("[xboard-daemon] push traffic: ", err)
 		}
 	}
@@ -257,8 +259,9 @@ func (d *XboardDaemon) pushStatus() {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
-	cpu := 0.0 // CPU measurement would need per-interval sampling
-	mem := [2]uint64{m.Alloc, m.Sys}
+	// Note: CPU measurement requires per-interval sampling outside this goroutine
+	cpu := 0.0
+	mem := [2]uint64{m.Alloc, m.Sys}  // total=sys, used=alloc
 	swap := [2]uint64{0, 0}
 	disk := [2]uint64{0, 0}
 
@@ -290,15 +293,9 @@ func (d *XboardDaemon) GetStatus() map[string]interface{} {
 		"enabled":    cfg.Node,
 		"connected":  d.connected,
 		"lastSync":   d.lastSync.Format(time.RFC3339),
-		"lastReport":  d.lastTraffic.Format(time.RFC3339),
+		"lastReport": d.lastTraffic.Format(time.RFC3339),
 		"apiHost":    cfg.Xboard.ApiHost,
 		"nodeId":     cfg.Xboard.NodeID,
 		"nodeType":   cfg.Xboard.NodeType,
 	}
-}
-
-// marshalInbounds is a helper.
-func marshalInboundsJSON(ids []uint) []byte {
-	data, _ := json.Marshal(ids)
-	return data
 }

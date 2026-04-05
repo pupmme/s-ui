@@ -15,30 +15,28 @@ type XboardSync struct {
 	client *network.XboardClient
 }
 
-// NewXboardSync creates a new sync service.
-func NewXboardSync() *XboardSync {
-	return &XboardSync{
-		client: network.NewXboardClient(),
-	}
+// NewXboardSync creates a new sync service with a shared xboard client.
+func NewXboardSync(client *network.XboardClient) *XboardSync {
+	return &XboardSync{client: client}
 }
 
-// DoFullSync performs a complete sync: handshake + config + users.
-func (s *XboardSync) DoFullSync() error {
-	cfg := config.Get()
-	if !cfg.Node {
-		return fmt.Errorf("sync is only available in node mode")
+// Sync performs config + user sync. Pass initial=true to also do handshake.
+func (s *XboardSync) Sync(initial bool) error {
+	if initial {
+		cfg := config.Get()
+		if !cfg.Node {
+			return fmt.Errorf("sync is only available in node mode")
+		}
+		hs, err := s.client.Handshake()
+		if err != nil {
+			return fmt.Errorf("handshake failed: %w", err)
+		}
+		logger.Info("[xboard-sync] connected to xboard ", hs.Version)
+	} else {
+		logger.Debug("[xboard-sync] incremental sync")
 	}
 
-	logger.Info("[xboard-sync] starting full sync...")
-
-	// Step 1: Handshake — register node with xboard
-	hs, err := s.client.Handshake()
-	if err != nil {
-		return fmt.Errorf("handshake failed: %w", err)
-	}
-	logger.Info("[xboard-sync] connected to xboard ", hs.Version)
-
-	// Step 2: Get latest inbound config
+	// Get latest inbound config
 	nodeCfg, err := s.client.GetConfig()
 	if err != nil {
 		logger.Info("[xboard-sync] get config: ", err)
@@ -50,7 +48,7 @@ func (s *XboardSync) DoFullSync() error {
 		}
 	}
 
-	// Step 3: Get latest users
+	// Get latest users
 	users, err := s.client.GetUsers()
 	if err != nil {
 		logger.Info("[xboard-sync] get users: ", err)
@@ -62,7 +60,7 @@ func (s *XboardSync) DoFullSync() error {
 		}
 	}
 
-	logger.Info("[xboard-sync] full sync completed")
+	logger.Info("[xboard-sync] sync completed")
 	return nil
 }
 
@@ -71,14 +69,14 @@ func (s *XboardSync) applyInboundConfig(nodeCfg *network.NodeConfig) error {
 	cfg := db.Get()
 
 	// Find or create inbound matching this tag
-	var target *db.Inbound
+	var targetIdx int = -1
 	for i := range cfg.Inbounds {
 		if cfg.Inbounds[i].Tag == nodeCfg.Tag {
-			target = &cfg.Inbounds[i]
+			targetIdx = i
 			break
 		}
 	}
-	if target == nil {
+	if targetIdx == -1 {
 		// Create new inbound
 		newID := uint(1)
 		for _, ib := range cfg.Inbounds {
@@ -94,16 +92,16 @@ func (s *XboardSync) applyInboundConfig(nodeCfg *network.NodeConfig) error {
 			Id:     newID,
 			Type:   nodeCfg.Protocol,
 			Tag:    nodeCfg.Tag,
-			Addrs:  []byte(fmt.Sprintf(`["%s"]`, listen)),
+			Addrs:  []byte(fmt.Sprintf(`{"listen":"%s","listen_port":%d}`, listen, nodeCfg.Port)),
 			OutJson: nodeCfg.Settings,
 		})
 		logger.Info("[xboard-sync] created inbound: ", nodeCfg.Tag)
 	} else {
-		// Update existing
+		// Update existing by slice index, not by business Id
 		if nodeCfg.Listen != "" {
-			cfg.Inbounds[target.Id].Addrs = []byte(fmt.Sprintf(`["%s"]`, nodeCfg.Listen))
+			cfg.Inbounds[targetIdx].Addrs = []byte(fmt.Sprintf(`{"listen":"%s","listen_port":%d}`, nodeCfg.Listen, nodeCfg.Port))
 		}
-		cfg.Inbounds[target.Id].OutJson = nodeCfg.Settings
+		cfg.Inbounds[targetIdx].OutJson = nodeCfg.Settings
 		logger.Info("[xboard-sync] updated inbound: ", nodeCfg.Tag)
 	}
 

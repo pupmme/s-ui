@@ -24,8 +24,7 @@ func (s *ConfigService) StartCore() error {
 	if c.IsRunning() {
 		return nil
 	}
-	cfg := db.Get()
-	data, err := json.Marshal(cfg)
+	data, err := buildSingboxConfig()
 	if err != nil {
 		return err
 	}
@@ -39,8 +38,7 @@ func (s *ConfigService) StopCore() error {
 func (s *ConfigService) RestartCore() error {
 	c := core.GetCore()
 	c.Stop()
-	cfg := db.Get()
-	data, err := json.Marshal(cfg)
+	data, err := buildSingboxConfig()
 	if err != nil {
 		return err
 	}
@@ -48,6 +46,16 @@ func (s *ConfigService) RestartCore() error {
 }
 
 func (s *ConfigService) Save(obj string, act string, data json.RawMessage) error {
-	logger.Info("Config.Save: ", obj, " ", act)
-	return nil
+	is := &InboundService{}
+	cs := &ClientService{}
+	switch obj {
+	case "inbound":
+		return is.Save(nil, act, data, "", "")
+	case "client":
+		_, err := cs.Save(nil, act, data, "")
+		return err
+	default:
+		logger.Debug("Config.Save: unhandled object ", obj, " ", act)
+		return nil
+	}
 }

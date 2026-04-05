@@ -180,10 +180,7 @@ func (c *XboardClient) Report(traffic map[int64][2]int64, alive map[int64][]stri
 	}
 	payload["status"] = status
 
-	if err := c.postJSON("/api/v1/server/UniProxy/push", payload); err != nil {
-		return err
-	}
-	return c.postJSON("/api/v1/server/UniProxy/status", status)
+	return c.postJSON("/api/v1/server/UniProxy/push", payload)
 }
 
 // PushStatus sends system status to the panel.
