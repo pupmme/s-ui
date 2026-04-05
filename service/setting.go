@@ -46,6 +46,9 @@ var defaultValueMap = map[string]string{
 	"subClashExt":   "",
 	"config":        defaultConfig,
 	"version":       "sub",
+	"nodeMode":      "false",
+	"xboardApiHost": "",
+	"xboardApiKey":  "",
 }
 
 type SettingService struct{}
@@ -209,6 +212,31 @@ func (s *SettingService) GetSessionMaxAge() (int, error) {
 
 func (s *SettingService) GetTrafficAge() (int, error) {
 	return s.getInt("trafficAge")
+}
+
+// Node mode settings
+func (s *SettingService) GetNodeMode() (bool, error) {
+	return s.getBool("nodeMode")
+}
+
+func (s *SettingService) SetNodeMode(enabled bool) error {
+	return s.setString("nodeMode", strconv.FormatBool(enabled))
+}
+
+func (s *SettingService) GetXboardApiHost() (string, error) {
+	return s.getString("xboardApiHost")
+}
+
+func (s *SettingService) SetXboardApiHost(host string) error {
+	return s.setString("xboardApiHost", host)
+}
+
+func (s *SettingService) GetXboardApiKey() (string, error) {
+	return s.getString("xboardApiKey")
+}
+
+func (s *SettingService) SetXboardApiKey(key string) error {
+	return s.setString("xboardApiKey", key)
 }
 
 func (s *SettingService) GetTimeLocation() (*time.Location, error) {

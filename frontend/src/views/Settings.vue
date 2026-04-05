@@ -69,6 +69,46 @@
             <v-text-field v-model="settings.timeLocation" :label="$t('setting.timeLoc')" hide-details></v-text-field>
           </v-col>
         </v-row>
+
+        <v-divider class="my-4" />
+
+        <v-row align="center">
+          <v-col cols="12" sm="6" md="4">
+            <v-switch
+              v-model="nodeMode"
+              color="primary"
+              :label="$t('setting.nodeMode')"
+              hide-details
+            ></v-switch>
+          </v-col>
+          <v-col cols="12" sm="6" md="4">
+            <v-chip v-if="nodeMode" color="success" variant="flat">Node 模式</v-chip>
+            <v-chip v-else color="info" variant="flat">Local 模式</v-chip>
+          </v-col>
+        </v-row>
+
+        <v-expand-transition>
+          <div v-if="nodeMode">
+            <v-row>
+              <v-col cols="12" sm="6" md="4">
+                <v-text-field
+                  v-model="settings.xboardApiHost"
+                  :label="$t('setting.xboardApiHost')"
+                  placeholder="https://s.pupm.us"
+                  hide-details
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="6" md="4">
+                <v-text-field
+                  v-model="settings.xboardApiKey"
+                  :label="$t('setting.xboardApiKey')"
+                  placeholder="API Key"
+                  hide-details
+                ></v-text-field>
+              </v-col>
+            </v-row>
+          </div>
+        </v-expand-transition>
       </v-window-item>
 
                       </v-window>
@@ -111,6 +151,9 @@ const settings = ref({
 	subURI: "",
   subJsonExt: "",
   subClashExt: "",
+  nodeMode: "false",
+  xboardApiHost: "",
+  xboardApiKey: "",
 })
 
 onMounted(async () => {
@@ -212,6 +255,11 @@ const subPort = computed({
 const subUpdates = computed({
   get: () => { return settings.value.subUpdates.length>0 ? parseInt(settings.value.subUpdates) : 12 },
   set: (v:number) => { settings.value.subUpdates = v>0 ? v.toString() : "12" }
+})
+
+const nodeMode = computed({
+  get: () => { return settings.value.nodeMode == "true" },
+  set: (v:boolean) => { settings.value.nodeMode = v ? "true" : "false" }
 })
 
 const stateChange = computed(() => {

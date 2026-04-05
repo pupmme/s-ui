@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 
 	"github.com/pupmme/sub/config"
@@ -196,6 +197,34 @@ func (a *ApiService) GetSettings(c *gin.Context) {
 		return
 	}
 	c.JSON(200, gin.H{"success": true, "obj": settings})
+}
+
+// GetNodeMode returns the current node mode setting
+func (a *ApiService) GetNodeMode(c *gin.Context) {
+	nodeMode, _ := a.SettingService.GetNodeMode()
+	xboardApiHost, _ := a.SettingService.GetXboardApiHost()
+	xboardApiKey, _ := a.SettingService.GetXboardApiKey()
+	c.JSON(200, gin.H{
+		"success": true,
+		"obj": gin.H{
+			"nodeMode":      nodeMode,
+			"xboardApiHost": xboardApiHost,
+			"xboardApiKey":  xboardApiKey,
+		},
+	})
+}
+
+// SetNodeMode sets the node mode and xboard config
+func (a *ApiService) SetNodeMode(c *gin.Context) {
+	nodeMode, _ := strconv.ParseBool(c.PostForm("nodeMode"))
+	xboardApiHost := c.PostForm("xboardApiHost")
+	xboardApiKey := c.PostForm("xboardApiKey")
+
+	a.SettingService.SetNodeMode(nodeMode)
+	a.SettingService.SetXboardApiHost(xboardApiHost)
+	a.SettingService.SetXboardApiKey(xboardApiKey)
+
+	jsonMsg(c, "nodeMode", nil)
 }
 
 // GetStatus returns system status

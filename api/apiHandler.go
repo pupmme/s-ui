@@ -60,6 +60,8 @@ func (a *APIHandler) postHandler(c *gin.Context) {
 		a.ApiService.SubConvert(c)
 	case "linkConvert":
 		a.ApiService.LinkConvert(c)
+	case "setNodeMode":
+		a.ApiService.SetNodeMode(c)
 	default:
 		fmt.Println("unknown action: " + action)
 	}
@@ -90,6 +92,8 @@ func (a *APIHandler) getHandler(c *gin.Context) {
 		a.ApiService.GetKeypairs(c)
 	case "checkOutbound":
 		a.ApiService.CheckOutbound(c)
+	case "nodeMode":
+		a.ApiService.GetNodeMode(c)
 	default:
 		fmt.Println("unknown action: " + action)
 	}

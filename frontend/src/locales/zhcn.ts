@@ -196,6 +196,9 @@ export default {
     clashSub: "Clash 订阅",
     mixedPort: "混合入站端口",
     tun: "Tun 入站",
+    nodeMode: "Node 模式",
+    xboardApiHost: "Xboard API 地址",
+    xboardApiKey: "Xboard API 密钥",
   },
   client: {
     name: "名称",
