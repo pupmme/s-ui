@@ -1,8 +1,8 @@
 #!/bin/sh
 
-DB_PATH="${SUI_DB_FOLDER:-/app/db}/s-ui.db"
+DB_PATH="${SUI_DB_FOLDER:-/app/db}/pupmsub.db"
 if [ -f "$DB_PATH" ]; then
-	./sui migrate
+	./pupmsub migrate
 fi
 
-exec ./sui
+exec ./pupmsub "$@"

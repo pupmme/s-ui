@@ -18,7 +18,7 @@ import (
 )
 
 // XboardDaemon runs as a background goroutine, handling all xboard communication.
-// It replaces xboard-node entirely — s-ui manages itself as a xboard sub-node.
+// It replaces xboard-node entirely — pupmsub manages itself as a xboard sub-node.
 type XboardDaemon struct {
 	client  *network.XboardClient
 	syncSvc *XboardSync

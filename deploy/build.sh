@@ -11,9 +11,9 @@ GOARCH=amd64 go build -ldflags="-s -w" -o dist/sui .
 mkdir -p dist
 tar -czf "${OUTPUT}" \
     dist/sui \
-    s-ui.service \
+    pupmsub.service \
     install.sh \
-    s-ui.sh \
+    pupmsub.sh \
     README.md
 
 echo "Built: ${OUTPUT}"

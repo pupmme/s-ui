@@ -10,7 +10,7 @@ import (
 	"github.com/pupmme/sub/network"
 )
 
-// XboardSync handles data synchronization between s-ui (node) and xboard (server).
+// XboardSync handles data synchronization between pupmsub (node) and xboard (server).
 type XboardSync struct {
 	client *network.XboardClient
 }

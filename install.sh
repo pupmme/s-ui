@@ -2,7 +2,7 @@
 set -e
 
 # =============================================
-# pupmme/s-ui 安装脚本
+# pupmsub 安装脚本
 # =============================================
 
 red='\033[0;31m'
@@ -11,13 +11,13 @@ yellow='\033[0;33m'
 blue='\033[0;34m'
 plain='\033[0m'
 
-NAME="s-ui"
+NAME="pupmsub"
 BINARY_NAME="sui"
 BIN_DIR="/usr/local/${NAME}"
 CFG_DIR="/etc/sub"
 BIN_PATH="${BIN_DIR}/${BINARY_NAME}"
 CMD_PATH="/usr/bin/${BINARY_NAME}"
-SERVICE_NAME="s-ui"
+SERVICE_NAME="pupmsub"
 SERVICE_PATH="/etc/systemd/system/${SERVICE_NAME}.service"
 
 GIT_RAW="https://raw.githubusercontent.com/pupmme/s-ui"
@@ -88,7 +88,7 @@ install_base() {
 write_systemd() {
     cat > "${SERVICE_PATH}" << EOF
 [Unit]
-Description=pupmme s-ui panel
+Description=pupmme pupmsub agent
 After=network.target
 Wants=network.target
 
@@ -160,9 +160,9 @@ EOF
 fetch_binary() {
     local arch=$(arch_detect)
     local tmp_dir=$(mktemp -d)
-    local tmp_tar="${tmp_dir}/s-ui.tar.gz"
+    local tmp_tar="${tmp_dir}/pupmsub.tar.gz"
 
-    info "下载 s-ui ${arch} ..."
+    info "下载 pupmsub ${arch} ..."
 
     # 获取版本
     if [[ $# -eq 0 ]]; then
@@ -178,7 +178,7 @@ fetch_binary() {
     info "版本: ${latest}"
 
     # 多镜像下载
-    local base_url="${REPO_DOWNLOAD}/${latest}/s-ui-linux-${arch}.tar.gz"
+    local base_url="${REPO_DOWNLOAD}/${latest}/pupmsub-linux-${arch}.tar.gz"
     local mirrors=(
         "https://gh-proxy.com${base_url}"
         "https://ghfast.top${base_url}"
@@ -215,9 +215,9 @@ fetch_binary() {
     mkdir -p "${BIN_DIR}"
     cp "${tmp_dir}/${extracted_dir}/sui" "${BIN_PATH}"
     chmod +x "${BIN_PATH}"
-    cp "${tmp_dir}/${extracted_dir}/s-ui.sh" "${BIN_DIR}/"
-    chmod +x "${BIN_DIR}/s-ui.sh"
-    ln -sf "${BIN_DIR}/s-ui.sh" "${CMD_PATH}"
+    cp "${tmp_dir}/${extracted_dir}/pupmsub.sh" "${BIN_DIR}/"
+    chmod +x "${BIN_DIR}/pupmsub.sh"
+    ln -sf "${BIN_DIR}/pupmsub.sh" "${CMD_PATH}"
 
     rm -rf "${tmp_dir}"
     success "二进制安装完成 (${BIN_PATH})"
@@ -229,7 +229,7 @@ enable_start() {
     sleep 1
 
     if systemctl is-active --quiet ${SERVICE_NAME}; then
-        success "s-ui 服务已启动"
+        success "pupmsub 服务已启动"
     else
         error "服务启动失败，请查看 journalctl -u ${SERVICE_NAME} -n 20"
         exit 1
@@ -239,7 +239,7 @@ enable_start() {
 show_info() {
     echo ""
     echo "============================================"
-    success "s-ui 安装完成！"
+    success "pupmsub 安装完成！"
     echo "============================================"
     echo ""
     echo "管理命令: ${CMD_PATH}"
@@ -256,7 +256,7 @@ show_info() {
 # =============================================
 main() {
     echo -e "${green}============================================"
-    echo -e "  pupmme/s-ui 安装脚本"
+    echo -e "  pupmsub 安装脚本"
     echo -e "============================================${plain}"
     echo ""
 

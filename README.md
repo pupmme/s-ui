@@ -1,41 +1,67 @@
-# s-ui (sub edition)
+# pupmsub
 
-基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) 改造的面板，移除了本地用户管理和订阅功能。
+基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) 改造的 sing-box 节点管理器（xboard sub-node agent），移除了本地用户管理和订阅功能。
 
-## 改造内容
+## 核心定位
 
-- ✅ 移除订阅面板和订阅链接生成
-- ✅ 移除本地用户注册/登录
-- ✅ 移除 ruleset 在线订阅下载
-- ✅ 移除 telegram/bot 订阅服务
-- ✅ 移除 sub 独立订阅服务 (`sub.Server`)
-- ✅ 移除 s-ui 内嵌 sing-box（节点侧由 pupmsub/sub 接管）
-- ✅ 移除 Token 认证（APIv2）
-- ✅ 保留节点入站配置展示
-- ✅ 保留用户列表只读展示（从 `/etc/sub/singbox.json` 读取）
-- ✅ 保留 sing-box 配置读取
-- ✅ 保留路由/出站配置展示
+节点侧 agent，通过 xboard v2 协议（handshake → pull config/users → report traffic）接入 xboard 管理面板。每个节点独立运行，通过 xboard 下发的差异化 sing-box inbound 配置工作。
 
-## 依赖
+## 架构
 
-- Go 1.24+
-- Node.js (前端构建，如需重新打包)
-- sing-box v1.13.4+
+```
+xboard (管理面板)
+    │  ← xboard v2 协议 (handshake / get_config / get_users / push_traffic)
+    ↓
+pupmsub (节点侧 agent)
+    │  ← /etc/sub/config.json (xboard 连接配置)
+    ↓
+pupmsub/sub (sing-box 核心)
+    │  ← /etc/sub/singbox.json (节点 inbound + 用户配置)
+    ↓
+sing-box (sing-box 内核)
+```
+
+## 功能
+
+- ✅ xboard v2 协议对接（handshake → sync → report）
+- ✅ 节点差异化 inbound 配置下发
+- ✅ 流量上报（per-user delta）
+- ✅ 系统状态上报（CPU / 内存 / 磁盘）
+- ✅ 移除订阅、注册登录、ruleset 下载、telegram bot
+- ✅ 前端只读展示 inbounds / outbounds / clients
 
 ## 构建
 
 ```bash
-go build -o s-ui .
+# 前端
+cd frontend && npm i && npm run build
+cp -R frontend/dist web/
+
+# 后端 (glibc)
+CGO_ENABLED=0 go build -ldflags '-w -s' -o pupmsub .
+
+# 后端 (musl, for Alpine/Docker)
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-w -s -extldflags "-static"' -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor" -o pupmsub .
 ```
 
 ## 运行
 
 ```bash
-./s-ui
+# 节点模式（接入 xboard）
+./pupmsub run
+./pupmsub node      # 查看节点状态
+./pupmsub sync      # 手动触发一次同步
+./pupmsub restart   # 重启 sing-box
+
+# 面板模式（独立 Web UI）
+./pupmsub web
 ```
 
-## 数据来源
+## 配置
 
-节点入站信息和用户列表从 sub (pupmsub) 的本地文件读取：
-- `/etc/sub/singbox.json` - sing-box 原生配置
-- `/etc/sub/config.json` - V2bX 节点配置
+- `/etc/sub/config.json` — xboard 连接信息（apiHost / apiKey / nodeId / nodeType）
+- `/etc/sub/singbox.json` — sing-box 配置（inbounds / outbounds / clients）
+
+## 协议
+
+[xboard v2 Server API]: https://github.com/w panels/xboard/blob/master/doc/v2-server-api.md

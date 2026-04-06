@@ -51,7 +51,7 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 	return nil, common.NewError("clients are read-only in node mode")
 }
 
-// IsNodeMode returns true when s-ui is acting as a node proxy to xboard.
+// IsNodeMode returns true when pupmsub is acting as a node proxy to xboard.
 func (s *ClientService) IsNodeMode() bool {
 	return config.Get().Node
 }

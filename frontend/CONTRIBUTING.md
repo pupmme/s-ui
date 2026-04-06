@@ -1,6 +1,6 @@
-# Contributing to S-UI-Frontend
+# Contributing to pupmsub-Frontend
 
-Thank you for your interest in contributing to S-UI-Frontend. This document explains how to set up the project, follow our conventions, and submit changes.
+Thank you for your interest in contributing to pupmsub-Frontend. This document explains how to set up the project, follow our conventions, and submit changes.
 
 ## Table of Contents
 
@@ -22,7 +22,7 @@ Please be respectful and constructive. This project is for personal learning and
 2. **Clone** your fork locally:
    ```bash
    git clone https://github.com/YOUR_USERNAME/s-ui-frontend.git
-   cd s-ui-frontend
+   cd pupmsub-frontend
    ```
 3. Add the upstream remote (optional, for syncing):
    ```bash

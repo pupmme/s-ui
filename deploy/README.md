@@ -10,10 +10,10 @@ bash <(curl -Ls https://raw.githubusercontent.com/pupmme/s-ui/main/install.sh)
 
 ```bash
 # 1. 下载 release
-wget https://github.com/pupmme/s-ui/releases/latest/download/sub-linux-amd64.tar.gz
+wget https://github.com/pupmme/s-ui/releases/latest/download/pupmsub-linux-amd64.tar.gz
 
 # 2. 解压
-tar -xzf sub-linux-amd64.tar.gz
+tar -xzf pupmsub-linux-amd64.tar.gz
 
 # 3. 安装
 cd sub
@@ -24,7 +24,7 @@ chmod +x install.sh
 ## systemd 日志
 
 ```bash
-journalctl -u s-ui -f
+journalctl -u pupmsub -f
 ```
 
 ## 二进制路径
@@ -36,6 +36,6 @@ journalctl -u s-ui -f
 ## 交叉编译
 
 ```bash
-./deploy/build.sh amd64   # → dist/sub-linux-amd64.tar.gz
+./deploy/build.sh amd64   # → dist/pupmsub-linux-amd64.tar.gz
 ./deploy/build.sh arm64   # → dist/sub-linux-arm64.tar.gz
 ```

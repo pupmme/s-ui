@@ -83,13 +83,13 @@ const router = createRouter({
   routes,
 })
 
-const DEFAULT_TITLE = 'S-UI'
+const DEFAULT_TITLE = 'pupmsub'
 let intervalId:any
 
 // Navigation guard to check authentication state
 router.beforeEach((to) => {
   // Check the session cookie
-  const sessionCookie = document.cookie.split(';').find(cookie => cookie.trim().startsWith('s-ui='))
+  const sessionCookie = document.cookie.split(';').find(cookie => cookie.trim().startsWith('pupmsub='))
   const isAuthenticated = !!sessionCookie
 
   // If the route requires authentication and the user is not authenticated, redirect to /login
