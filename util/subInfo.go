@@ -3,7 +3,7 @@ package util
 import (
 	"fmt"
 
-	"github.com/pupmme/sub/db"
+	"github.com/pupmme/pupmmesub/db"
 )
 
 func GetHeaders(client *db.Client, updateInterval int) []string {

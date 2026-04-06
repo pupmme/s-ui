@@ -1,8 +1,8 @@
 	package service
 
 import (
-	"github.com/pupmme/sub/core"
-	"github.com/pupmme/sub/db"
+	"github.com/pupmme/pupmmesub/core"
+	"github.com/pupmme/pupmmesub/db"
 	"sort"
 	"time"
 

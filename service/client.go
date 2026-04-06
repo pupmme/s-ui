@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/pupmme/sub/config"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/logger"
-	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/pupmmesub/config"
+	"github.com/pupmme/pupmmesub/db"
+	"github.com/pupmme/pupmmesub/logger"
+	"github.com/pupmme/pupmmesub/util/common"
 	"strings"
 )
 
@@ -51,7 +51,7 @@ func (s *ClientService) Save(tx interface{}, act string, data json.RawMessage, h
 	return nil, common.NewError("clients are read-only in node mode")
 }
 
-// IsNodeMode returns true when pupmsub is acting as a node proxy to xboard.
+// IsNodeMode returns true when pupmmesub is acting as a node proxy to xboard.
 func (s *ClientService) IsNodeMode() bool {
 	return config.Get().Node
 }

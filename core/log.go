@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	suiLog "github.com/pupmme/sub/logger"
+	suiLog "github.com/pupmme/pupmmesub/logger"
 
 	"github.com/sagernet/sing-box/log"
 	"github.com/sagernet/sing/common"

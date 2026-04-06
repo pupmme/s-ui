@@ -3,9 +3,9 @@ package service
 import (
 	"encoding/json"
 
-	"github.com/pupmme/sub/core"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/pupmmesub/core"
+	"github.com/pupmme/pupmmesub/db"
+	"github.com/pupmme/pupmmesub/logger"
 )
 
 type ConfigService struct{}

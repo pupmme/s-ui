@@ -1,1 +1,0 @@
-/tmp/pupmsub-refactor/api/panel/node_test.go

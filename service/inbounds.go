@@ -1,10 +1,10 @@
 	package service
 
 import (
-	"github.com/pupmme/sub/core"
-	"github.com/pupmme/sub/util"
-	"github.com/pupmme/sub/util/common"
-	"github.com/pupmme/sub/db"
+	"github.com/pupmme/pupmmesub/core"
+	"github.com/pupmme/pupmmesub/util"
+	"github.com/pupmme/pupmmesub/util/common"
+	"github.com/pupmme/pupmmesub/db"
 	"encoding/json"
 	"strings"
 

@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pupmme/sub/api"
-	"github.com/pupmme/sub/config"
-	"github.com/pupmme/sub/logger"
-	"github.com/pupmme/sub/middleware"
-	"github.com/pupmme/sub/network"
-	"github.com/pupmme/sub/service"
+	"github.com/pupmme/pupmmesub/api"
+	"github.com/pupmme/pupmmesub/config"
+	"github.com/pupmme/pupmmesub/logger"
+	"github.com/pupmme/pupmmesub/middleware"
+	"github.com/pupmme/pupmmesub/network"
+	"github.com/pupmme/pupmmesub/service"
 
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/sessions"
@@ -86,7 +86,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	engine.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	store := cookie.NewStore(secret)
-	engine.Use(sessions.Sessions("pupmsub", store))
+	engine.Use(sessions.Sessions("sub", store))
 
 	// Serve assets under base_url/assets/ so SPA can load them
 	assetsBasePath := base_url + "assets/"

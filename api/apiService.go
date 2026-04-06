@@ -5,10 +5,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pupmme/sub/config"
-	"github.com/pupmme/sub/logger"
-	"github.com/pupmme/sub/service"
-	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/pupmmesub/config"
+	"github.com/pupmme/pupmmesub/logger"
+	"github.com/pupmme/pupmmesub/service"
+	"github.com/pupmme/pupmmesub/util/common"
 
 	"github.com/gin-gonic/gin"
 )

@@ -1,9 +1,9 @@
 	package service
 
 import (
-	"github.com/pupmme/sub/core"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/pupmmesub/core"
+	"github.com/pupmme/pupmmesub/db"
+	"github.com/pupmme/pupmmesub/logger"
 	"encoding/base64"
 	"os"
 	"runtime"

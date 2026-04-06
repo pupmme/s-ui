@@ -1,4 +1,4 @@
-# pupmsub
+# pupmmesub
 
 基于 [alireza0/s-ui](https://github.com/alireza0/s-ui) 改造的 sing-box 节点管理器（xboard sub-node agent），移除了本地用户管理和订阅功能。
 
@@ -12,10 +12,10 @@
 xboard (管理面板)
     │  ← xboard v2 协议 (handshake / get_config / get_users / push_traffic)
     ↓
-pupmsub (节点侧 agent)
+pupmmesub (节点侧 agent)
     │  ← /etc/sub/config.json (xboard 连接配置)
     ↓
-pupmsub/sub (sing-box 核心)
+pupmmesub/sub (sing-box 核心)
     │  ← /etc/sub/singbox.json (节点 inbound + 用户配置)
     ↓
 sing-box (sing-box 内核)
@@ -38,23 +38,23 @@ cd frontend && npm i && npm run build
 cp -R frontend/dist web/
 
 # 后端 (glibc)
-CGO_ENABLED=0 go build -ldflags '-w -s' -o pupmsub .
+CGO_ENABLED=0 go build -ldflags '-w -s' -o pupmmesub .
 
 # 后端 (musl, for Alpine/Docker)
-CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-w -s -extldflags "-static"' -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor" -o pupmsub .
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags '-w -s -extldflags "-static"' -tags "with_quic,with_grpc,with_utls,with_acme,with_gvisor" -o pupmmesub .
 ```
 
 ## 运行
 
 ```bash
 # 节点模式（接入 xboard）
-./pupmsub run
-./pupmsub node      # 查看节点状态
-./pupmsub sync      # 手动触发一次同步
-./pupmsub restart   # 重启 sing-box
+./pupmmesub run
+./pupmmesub node      # 查看节点状态
+./pupmmesub sync      # 手动触发一次同步
+./pupmmesub restart   # 重启 sing-box
 
 # 面板模式（独立 Web UI）
-./pupmsub web
+./pupmmesub web
 ```
 
 ## 配置

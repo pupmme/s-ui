@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/pupmmesub/logger"
 )
 
 func NewErrorf(format string, a ...interface{}) error {

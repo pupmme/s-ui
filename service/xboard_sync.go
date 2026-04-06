@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/pupmme/sub/config"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/logger"
-	"github.com/pupmme/sub/network"
+	"github.com/pupmme/pupmmesub/config"
+	"github.com/pupmme/pupmmesub/db"
+	"github.com/pupmme/pupmmesub/logger"
+	"github.com/pupmme/pupmmesub/network"
 )
 
-// XboardSync handles data synchronization between pupmsub (node) and xboard (server).
+// XboardSync handles data synchronization between pupmmesub (node) and xboard (server).
 type XboardSync struct {
 	client *network.XboardClient
 }

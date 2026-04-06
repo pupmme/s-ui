@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/pupmmesub/util/common"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/adapter/endpoint"

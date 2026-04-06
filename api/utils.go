@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/pupmmesub/logger"
 
 	"github.com/gin-gonic/gin"
 )

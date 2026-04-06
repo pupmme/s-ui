@@ -1,10 +1,10 @@
 	package service
 
 import (
-	"github.com/pupmme/sub/config"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/logger"
-	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/pupmmesub/config"
+	"github.com/pupmme/pupmmesub/db"
+	"github.com/pupmme/pupmmesub/logger"
+	"github.com/pupmme/pupmmesub/util/common"
 	"encoding/json"
 	"os"
 	"runtime"

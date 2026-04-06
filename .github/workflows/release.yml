@@ -1,4 +1,4 @@
-name: Release S-UI
+name: Release pupmmesub
 
 on:
   workflow_dispatch:
@@ -169,23 +169,22 @@ jobs:
           set -e
           BUILD_TAGS="with_quic,with_grpc,with_utls,with_acme,with_gvisor,badlinkname,tfogo_checklinkname0,with_tailscale"
           [ "${{ matrix.naive }}" = "true" ] && BUILD_TAGS="${BUILD_TAGS},with_naive_outbound,with_musl"
-          go build -ldflags="-w -s -checklinkname=0 -linkmode external -extldflags '-static'" -tags "$BUILD_TAGS" -o sui main.go
-          file sui
-          ldd sui 2>/dev/null || echo "Static binary confirmed"
+          go build -ldflags="-w -s -checklinkname=0 -linkmode external -extldflags '-static'" -tags "$BUILD_TAGS" -o sub main.go
+          file sub
+          ldd sub 2>/dev/null || echo "Static binary confirmed"
 
-          mkdir s-ui
-          cp sui s-ui/
-          cp s-ui.service s-ui/
-          cp s-ui.sh s-ui/
+          mkdir pupmmesub
+          cp sub pupmmesub/
+          cp pupmmesub.service pupmmesub/
 
       - name: Package
-        run: tar -zcvf s-ui-linux-${{ matrix.platform }}.tar.gz s-ui
+        run: tar -zcvf pupmmesub-linux-${{ matrix.platform }}.tar.gz pupmmesub
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: s-ui-linux-${{ matrix.platform }}
-          path: ./s-ui-linux-${{ matrix.platform }}.tar.gz
+          name: pupmmesub-linux-${{ matrix.platform }}
+          path: ./pupmmesub-linux-${{ matrix.platform }}.tar.gz
           retention-days: 30
 
       - name: Upload to Release
@@ -196,7 +195,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref_name }}
-          file: s-ui-linux-${{ matrix.platform }}.tar.gz
-          asset_name: s-ui-linux-${{ matrix.platform }}.tar.gz
+          file: pupmmesub-linux-${{ matrix.platform }}.tar.gz
+          asset_name: pupmmesub-linux-${{ matrix.platform }}.tar.gz
           prerelease: true
           overwrite: true

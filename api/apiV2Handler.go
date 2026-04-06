@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/util/common"
+	"github.com/pupmme/pupmmesub/db"
+	"github.com/pupmme/pupmmesub/util/common"
 
 	"github.com/gin-gonic/gin"
 )

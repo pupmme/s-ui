@@ -1,4 +1,4 @@
-# Contributing to pupmsub
+# Contributing to pupmmesub
 
 欢迎贡献。
 
@@ -12,10 +12,10 @@ cd s-ui
 cd frontend && npm i && npm run build && cd ..
 
 # 后端
-CGO_ENABLED=0 go build -ldflags '-w -s' -o pupmsub .
+CGO_ENABLED=0 go build -ldflags '-w -s' -o pupmmesub .
 
 # 运行
-SUI_DB_FOLDER=db SUI_DEBUG=true ./pupmsub run
+SUI_DB_FOLDER=db SUI_DEBUG=true ./pupmmesub run
 ```
 
 ## 环境变量

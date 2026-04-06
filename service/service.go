@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/pupmme/sub/config"
-	"github.com/pupmme/sub/core"
-	"github.com/pupmme/sub/db"
-	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/pupmmesub/config"
+	"github.com/pupmme/pupmmesub/core"
+	"github.com/pupmme/pupmmesub/db"
+	"github.com/pupmme/pupmmesub/logger"
 )
 
 type Core struct {

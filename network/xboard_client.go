@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pupmme/sub/config"
-	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/pupmmesub/config"
+	"github.com/pupmme/pupmmesub/logger"
 )
 
 // XboardClient communicates with the Xboard panel API (xboard-node protocol).

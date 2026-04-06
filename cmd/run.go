@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"github.com/pupmme/sub/app"
+	"github.com/pupmme/pupmmesub/app"
 	"github.com/spf13/cobra"
 )
 

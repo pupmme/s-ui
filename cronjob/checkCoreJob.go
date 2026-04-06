@@ -1,7 +1,7 @@
 package cronjob
 
 import (
-	"github.com/pupmme/sub/service"
+	"github.com/pupmme/pupmmesub/service"
 )
 
 type CheckCoreJob struct{}

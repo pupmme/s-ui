@@ -1,4 +1,4 @@
-module github.com/pupmme/sub
+module github.com/pupmme/pupmmesub
 
 go 1.25.7
 

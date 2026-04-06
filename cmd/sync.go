@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"github.com/pupmme/sub/config"
-	"github.com/pupmme/sub/logger"
-	"github.com/pupmme/sub/network"
-	"github.com/pupmme/sub/service"
+	"github.com/pupmme/pupmmesub/config"
+	"github.com/pupmme/pupmmesub/logger"
+	"github.com/pupmme/pupmmesub/network"
+	"github.com/pupmme/pupmmesub/service"
 	"github.com/spf13/cobra"
 )
 
