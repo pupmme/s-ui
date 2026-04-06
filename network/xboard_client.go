@@ -65,9 +65,15 @@ func (c *XboardClient) Handshake() (*HandshakeResponse, error) {
 		return nil, fmt.Errorf("handshake status %d: %s", resp.StatusCode, body)
 	}
 
+	// Read into buffer first so we can log raw body on decode failure
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+
 	var hs HandshakeResponse
-	if err := json.NewDecoder(resp.Body).Decode(&hs); err != nil {
-		return nil, fmt.Errorf("decode handshake: %w", err)
+	if err := json.Unmarshal(raw, &hs); err != nil {
+		return nil, fmt.Errorf("decode handshake (raw=%q): %w", string(raw), err)
 	}
 	c.mu.Lock()
 	c.connected = true

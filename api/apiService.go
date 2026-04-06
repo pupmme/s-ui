@@ -135,11 +135,6 @@ func (a *ApiService) Login(c *gin.Context) {
 		}
 	}
 
-	if !success && username == "admin" && password == "admin123" {
-		logger.Info("LOGIN: matched default")
-		success = true
-	}
-
 	if !success {
 		jsonMsg(c, "login", common.NewError("wrong user or password!"))
 		return

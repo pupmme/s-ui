@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/pupmme/sub/config"
 	"github.com/pupmme/sub/logger"
+	"github.com/pupmme/sub/network"
 	"github.com/pupmme/sub/service"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +22,7 @@ var syncCmd = &cobra.Command{
 			logger.Error("sync is only available in node mode")
 			return
 		}
-		sync := service.NewXboardSync(nil)
+		sync := service.NewXboardSync(network.NewXboardClient())
 		if err := sync.Sync(true); err != nil {
 			logger.Error("sync failed: ", err)
 			return

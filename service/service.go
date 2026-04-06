@@ -37,6 +37,7 @@ func (c *Core) Start() error {
 	if err != nil {
 		return err
 	}
+	c.started = true
 	return core.GetCore().Start(data)
 }
 

@@ -62,16 +62,22 @@ func (s *SettingService) GetAllSetting() (*map[string]string, error) {
 		allSetting[key] = value
 	}
 
+	// Batch-apply missing defaults, then persist once
+	var missing []string
 	for key, defaultValue := range defaultValueMap {
 		if _, exists := allSetting[key]; !exists {
-			cfg := db.Get()
 			if cfg.Settings == nil {
 				cfg.Settings = make(map[string]string)
 			}
 			cfg.Settings[key] = defaultValue
-			db.Set(cfg)
-			db.SaveConfig()
+			missing = append(missing, key)
 			allSetting[key] = defaultValue
+		}
+	}
+	if len(missing) > 0 {
+		db.Set(cfg)
+		if err := db.SaveConfig(); err != nil {
+			logger.Warning("GetAllSetting: save defaults ", missing, ": ", err)
 		}
 	}
 

@@ -73,20 +73,22 @@ func (s *StatsService) SaveStats(enableTraffic bool) error {
 		return nil
 	}
 
-	// Append new stats records
-	for _, stat := range *stats {
+	// Append new stats records (fetch cfg once, then batch)
+	if enableTraffic && len(*stats) > 0 {
 		cfg := db.Get()
-		cfg.Stats = append(cfg.Stats, db.Stat{
-			DateTime:  stat.DateTime,
-			Resource:  stat.Resource,
-			Tag:       stat.Tag,
-			Direction: stat.Direction,
-			Traffic:   stat.Traffic,
-		})
+		for _, stat := range *stats {
+			cfg.Stats = append(cfg.Stats, db.Stat{
+				DateTime:  stat.DateTime,
+				Resource:  stat.Resource,
+				Tag:       stat.Tag,
+				Direction: stat.Direction,
+				Traffic:   stat.Traffic,
+			})
+		}
 		db.Set(cfg)
+		return db.SaveConfig()
 	}
-
-	return db.SaveConfig()
+	return nil
 }
 
 func (s *StatsService) GetStats(resource string, tag string, limit int) ([]db.Stat, error) {

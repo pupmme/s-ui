@@ -213,6 +213,32 @@ func (s *XboardSync) applyUsers(users []network.User) error {
 	return db.SaveConfig()
 }
 
+// SyncWithHandshake applies the handshake response directly (no extra fetch needed).
+func (s *XboardSync) SyncWithHandshake(hs *network.HandshakeResponse) error {
+	if hs == nil {
+		return fmt.Errorf("nil handshake response")
+	}
+
+	if len(hs.Config) > 0 {
+		if err := s.applyInboundConfigRaw(hs.Config); err != nil {
+			logger.Error("[xboard-sync] apply inbound config from handshake: ", err)
+		} else {
+			logger.Info("[xboard-sync] inbound config applied from handshake")
+		}
+	}
+
+	if len(hs.Users) > 0 {
+		if err := s.applyUsersRaw(hs.Users); err != nil {
+			logger.Error("[xboard-sync] apply users from handshake: ", err)
+		} else {
+			logger.Info("[xboard-sync] ", len(hs.Users), " users applied from handshake")
+		}
+	}
+
+	logger.Info("[xboard-sync] sync completed")
+	return nil
+}
+
 // ReportTraffic sends traffic data to xboard.
 func (s *XboardSync) ReportTraffic(traffic map[int64][2]int64) error {
 	return s.client.Report(traffic, nil, nil, 0, [2]uint64{}, [2]uint64{}, [2]uint64{})

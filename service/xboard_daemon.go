@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"sync"
 	"time"
 
@@ -12,6 +11,10 @@ import (
 	"github.com/pupmme/sub/db"
 	"github.com/pupmme/sub/logger"
 	"github.com/pupmme/sub/network"
+
+	"github.com/shirou/gopsutil/v4/cpu"
+	"github.com/shirou/gopsutil/v4/disk"
+	"github.com/shirou/gopsutil/v4/mem"
 )
 
 // XboardDaemon runs as a background goroutine, handling all xboard communication.
@@ -27,6 +30,7 @@ type XboardDaemon struct {
 	lastSync    time.Time
 	lastTraffic time.Time
 	connected   bool
+	connMu      sync.RWMutex // ★ protects connected
 
 	// Per-user last seen traffic for delta computation
 	lastTrafficSnap map[int64][2]int64
@@ -105,9 +109,10 @@ func (d *XboardDaemon) doHandshake() {
 	for attempt := 1; attempt <= 3; attempt++ {
 		hs, err := d.client.Handshake()
 		if err == nil {
-			d.connected = true
+			d.setConnected(true)
 			logger.Info("[xboard-daemon] handshake ok, xboard version: ", hs.Version)
-			if err := d.syncSvc.Sync(false); err != nil {
+			// Pass hs data directly instead of re-fetching via Sync(false)
+			if err := d.syncSvc.SyncWithHandshake(hs); err != nil {
 				logger.Error("[xboard-daemon] initial sync failed: ", err)
 			}
 			if c := GetCoreService(); c != nil {
@@ -133,7 +138,7 @@ func (d *XboardDaemon) syncLoop() {
 		case <-d.ctx.Done():
 			return
 		case <-ticker.C:
-			if !d.connected {
+			if !d.isConnected() {
 				d.doHandshake()
 				continue
 			}
@@ -152,7 +157,7 @@ func (d *XboardDaemon) reportLoop() {
 		case <-d.ctx.Done():
 			return
 		case <-ticker.C:
-			if !d.connected {
+			if !d.isConnected() {
 				continue
 			}
 			d.pushTraffic()
@@ -170,7 +175,7 @@ func (d *XboardDaemon) statusLoop() {
 		case <-d.ctx.Done():
 			return
 		case <-ticker.C:
-			if !d.connected {
+			if !d.isConnected() {
 				continue
 			}
 			d.pushStatus()
@@ -256,28 +261,50 @@ func (d *XboardDaemon) pushStatus() {
 		return
 	}
 
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
+	cpuPct, _ := cpu.Percent(0, false)
+	var cpuVal float64
+	if len(cpuPct) > 0 {
+		cpuVal = cpuPct[0]
+	}
 
-	// Note: CPU measurement requires per-interval sampling outside this goroutine
-	cpu := 0.0
-	mem := [2]uint64{m.Alloc, m.Sys}  // total=sys, used=alloc
-	swap := [2]uint64{0, 0}
-	disk := [2]uint64{0, 0}
+	memInfo, _ := mem.VirtualMemory()
+	memTotal, memUsed := uint64(0), uint64(0)
+	if memInfo != nil {
+		memTotal = memInfo.Total
+		memUsed = memInfo.Used
+	}
 
-	if err := d.client.PushStatus(cpu, mem, swap, disk); err != nil {
+	swapTotal, swapUsed := uint64(0), uint64(0)
+	// disk usage of root partition
+	parts, _ := disk.Partitions(false)
+	var diskTotal, diskUsed uint64
+	for _, p := range parts {
+		if p.Mountpoint == "/" || p.Mountpoint == "" {
+			if usage, err := disk.Usage(p.Mountpoint); err == nil {
+				diskTotal = usage.Total
+				diskUsed = usage.Used
+			}
+			break
+		}
+	}
+
+	if err := d.client.PushStatus(cpuVal,
+		[2]uint64{memTotal, memUsed},
+		[2]uint64{swapTotal, swapUsed},
+		[2]uint64{diskTotal, diskUsed},
+	); err != nil {
 		logger.Debug("[xboard-daemon] push status: ", err)
 	}
 }
 
 // IsConnected returns the current connection status.
 func (d *XboardDaemon) IsConnected() bool {
-	return d.connected
+	return d.isConnected()
 }
 
 // TriggerSync forces an immediate sync (called from API or CLI).
 func (d *XboardDaemon) TriggerSync() error {
-	if !d.connected {
+	if !d.isConnected() {
 		return fmt.Errorf("not connected to xboard")
 	}
 	d.doSync()
@@ -291,11 +318,25 @@ func (d *XboardDaemon) GetStatus() map[string]interface{} {
 	cfg := config.Get()
 	return map[string]interface{}{
 		"enabled":    cfg.Node,
-		"connected":  d.connected,
+		"connected":  d.isConnected(),
 		"lastSync":   d.lastSync.Format(time.RFC3339),
 		"lastReport": d.lastTraffic.Format(time.RFC3339),
 		"apiHost":    cfg.Xboard.ApiHost,
 		"nodeId":     cfg.Xboard.NodeID,
 		"nodeType":   cfg.Xboard.NodeType,
 	}
+}
+
+// isConnected returns d.connected with read lock.
+func (d *XboardDaemon) isConnected() bool {
+	d.connMu.RLock()
+	defer d.connMu.RUnlock()
+	return d.connected
+}
+
+// setConnected sets d.connected with write lock.
+func (d *XboardDaemon) setConnected(v bool) {
+	d.connMu.Lock()
+	defer d.connMu.Unlock()
+	d.connected = v
 }
