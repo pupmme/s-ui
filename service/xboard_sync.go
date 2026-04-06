@@ -155,11 +155,18 @@ func (s *XboardSync) applyInboundConfig(nodeCfg *network.NodeConfig) error {
 
 // applyUsers applies the user list from xboard to local db.
 // In node mode, users are managed by xboard — we mirror them locally.
+// Uses O(N) map lookup instead of O(N²) nested loop.
 func (s *XboardSync) applyUsers(users []network.User) error {
 	cfg := db.Get()
 
+	// Index existing clients by Id (O(N))
+	idxById := make(map[int64]int, len(cfg.Clients))
+	for i, c := range cfg.Clients {
+		idxById[int64(c.Id)] = i
+	}
+
+	// Process each user from xboard (O(N))
 	for _, u := range users {
-		// Build xboard metadata stored in Config JSON
 		meta := map[string]interface{}{
 			"uuid":   u.UUID,
 			"email":  u.Email,
@@ -169,34 +176,25 @@ func (s *XboardSync) applyUsers(users []network.User) error {
 		}
 		metaJSON, _ := json.Marshal(meta)
 
-		// Build description for display
 		desc := u.Email
 		if desc == "" {
 			desc = fmt.Sprintf("xboard:%s", u.Username)
 		}
 
-		found := false
-		for i := range cfg.Clients {
-			if int64(cfg.Clients[i].Id) == u.ID {
-				// Update existing user
-				cfg.Clients[i].Enable = u.Enable
-				cfg.Clients[i].Up = u.Upload
-				cfg.Clients[i].Down = u.Download
-				cfg.Clients[i].Volume = u.Total
-				cfg.Clients[i].Expiry = u.ExpiryTime
-				cfg.Clients[i].Desc = desc
-				cfg.Clients[i].Config = metaJSON
-				found = true
-				logger.Debug("[xboard-sync] updated user: ", u.Username)
-				break
-			}
-		}
-		if !found {
-			// Create new client
+		if i, ok := idxById[u.ID]; ok {
+			cfg.Clients[i].Enable = u.Enable
+			cfg.Clients[i].Up = u.Upload
+			cfg.Clients[i].Down = u.Download
+			cfg.Clients[i].Volume = u.Total
+			cfg.Clients[i].Expiry = u.ExpiryTime
+			cfg.Clients[i].Desc = desc
+			cfg.Clients[i].Config = metaJSON
+			logger.Debug("[xboard-sync] updated user: ", u.Username)
+		} else {
 			cfg.Clients = append(cfg.Clients, db.Client{
 				Id:       uint(u.ID),
 				Name:     u.Username,
-			Enable:   u.Enable,
+				Enable:   u.Enable,
 				Up:       u.Upload,
 				Down:     u.Download,
 				Volume:   u.Total,

@@ -111,6 +111,18 @@ func (d *XboardDaemon) doHandshake() {
 		if err == nil {
 			d.setConnected(true)
 			logger.Info("[xboard-daemon] handshake ok, xboard version: ", hs.Version)
+
+			// Initialize traffic baseline from persisted DB before any report.
+			// This prevents silent traffic loss if pupmsub restarted while users were active.
+			d.syncMu.Lock()
+			if cfg := db.Get(); cfg != nil {
+				for _, c := range cfg.Clients {
+					d.lastTrafficSnap[int64(c.Id)] = [2]int64{c.Up, c.Down}
+				}
+				logger.Info("[xboard-daemon] traffic baseline loaded for ", len(cfg.Clients), " users")
+			}
+			d.syncMu.Unlock()
+
 			// Pass hs data directly instead of re-fetching via Sync(false)
 			if err := d.syncSvc.SyncWithHandshake(hs); err != nil {
 				logger.Error("[xboard-daemon] initial sync failed: ", err)
@@ -125,6 +137,9 @@ func (d *XboardDaemon) doHandshake() {
 			time.Sleep(time.Duration(attempt*5) * time.Second)
 		}
 	}
+	// ETag cache may be stale after prolonged failures — clear it so the next
+	// syncLoop attempt does not get stuck on 304 Not Modified.
+	d.client.ResetETags()
 	logger.Error("[xboard-daemon] all handshake attempts failed — daemon will retry in background")
 }
 
@@ -232,6 +247,7 @@ func (d *XboardDaemon) pushTraffic() {
 		logger.Debug("[xboard-daemon] save stats: ", err)
 	}
 
+	d.syncMu.Lock()
 	cfg := db.Get()
 	delta := make(map[int64][2]int64)
 	for _, c := range cfg.Clients {
@@ -239,11 +255,12 @@ func (d *XboardDaemon) pushTraffic() {
 		if ok {
 			delta[int64(c.Id)] = [2]int64{c.Up - last[0], c.Down - last[1]}
 		} else {
-			// First report — establish baseline with zero delta
+			// Baseline was 0 — report zero delta to establish new baseline
 			delta[int64(c.Id)] = [2]int64{0, 0}
 		}
 		d.lastTrafficSnap[int64(c.Id)] = [2]int64{c.Up, c.Down}
 	}
+	d.syncMu.Unlock()
 
 	if len(delta) > 0 {
 		if err := d.syncSvc.ReportTraffic(delta); err != nil {
