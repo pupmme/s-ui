@@ -6,14 +6,14 @@ ARCH=${1:-amd64}
 OUTPUT="dist/sub-linux-${ARCH}.tar.gz"
 
 echo "Building sub for ${ARCH}..."
-GOARCH=amd64 go build -ldflags="-s -w" -o dist/sui .
+GOARCH=amd64 go build -ldflags="-s -w" -o dist/sub .
 
 mkdir -p dist
 tar -czf "${OUTPUT}" \
-    dist/sui \
-    pupmmesub.service \
+    dist/sub \
+    pupmsub.service \
     install.sh \
-    pupmmesub.sh \
+    pupmsub.sh \
     README.md
 
 echo "Built: ${OUTPUT}"

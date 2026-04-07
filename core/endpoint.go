@@ -1,8 +1,8 @@
 package core
 
 import (
-	"github.com/pupmme/pupmmesub/logger"
-	"github.com/pupmme/pupmmesub/util/common"
+	"github.com/pupmme/pupmsub/logger"
+	"github.com/pupmme/pupmsub/util/common"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing-box/option"

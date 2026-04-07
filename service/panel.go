@@ -1,7 +1,7 @@
 package service
 
 import (
-	"github.com/pupmme/pupmmesub/logger"
+	"github.com/pupmme/pupmsub/logger"
 	"os"
 	"runtime"
 	"syscall"

@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/pupmme/pupmmesub/logger"
+	"github.com/pupmme/pupmsub/logger"
 
 	sb "github.com/sagernet/sing-box"
 	"github.com/sagernet/sing-box/adapter"

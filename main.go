@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/pupmme/pupmmesub/app"
-	"github.com/pupmme/pupmmesub/cmd"
+	"github.com/pupmme/pupmsub/app"
+	"github.com/pupmme/pupmsub/cmd"
 )
 
 func main() {

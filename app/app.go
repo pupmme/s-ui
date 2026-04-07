@@ -7,12 +7,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/pupmme/pupmmesub/config"
-	"github.com/pupmme/pupmmesub/cronjob"
-	"github.com/pupmme/pupmmesub/db"
-	"github.com/pupmme/pupmmesub/logger"
-	"github.com/pupmme/pupmmesub/service"
-	"github.com/pupmme/pupmmesub/web"
+	"github.com/pupmme/pupmsub/config"
+	"github.com/pupmme/pupmsub/cronjob"
+	"github.com/pupmme/pupmsub/db"
+	"github.com/pupmme/pupmsub/logger"
+	"github.com/pupmme/pupmsub/service"
+	"github.com/pupmme/pupmsub/web"
 )
 
 var (

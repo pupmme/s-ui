@@ -29,7 +29,7 @@ journalctl -u pupmmesub -f
 
 ## 二进制路径
 
-- `/usr/local/bin/sui` — 主程序
+- `/usr/local/bin/sub` — 主程序
 - `/etc/sub/singbox.json` — 数据文件
 - `/etc/sub/config.json` — 配置文件
 

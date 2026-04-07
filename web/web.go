@@ -13,12 +13,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pupmme/pupmmesub/api"
-	"github.com/pupmme/pupmmesub/config"
-	"github.com/pupmme/pupmmesub/logger"
-	"github.com/pupmme/pupmmesub/middleware"
-	"github.com/pupmme/pupmmesub/network"
-	"github.com/pupmme/pupmmesub/service"
+	"github.com/pupmme/pupmsub/api"
+	"github.com/pupmme/pupmsub/config"
+	"github.com/pupmme/pupmsub/logger"
+	"github.com/pupmme/pupmsub/middleware"
+	"github.com/pupmme/pupmsub/network"
+	"github.com/pupmme/pupmsub/service"
 
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/sessions"

@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pupmme/pupmmesub/config"
-	"github.com/pupmme/pupmmesub/core"
-	"github.com/pupmme/pupmmesub/db"
-	"github.com/pupmme/pupmmesub/logger"
-	"github.com/pupmme/pupmmesub/network"
+	"github.com/pupmme/pupmsub/config"
+	"github.com/pupmme/pupmsub/core"
+	"github.com/pupmme/pupmsub/db"
+	"github.com/pupmme/pupmsub/logger"
+	"github.com/pupmme/pupmsub/network"
 
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/disk"
@@ -18,7 +18,7 @@ import (
 )
 
 // XboardDaemon runs as a background goroutine, handling all xboard communication.
-// It replaces xboard-node entirely — pupmmesub manages itself as a xboard sub-node.
+// It replaces xboard-node entirely — pupmsub manages itself as a xboard sub-node.
 type XboardDaemon struct {
 	client  *network.XboardClient
 	syncSvc *XboardSync
@@ -113,7 +113,7 @@ func (d *XboardDaemon) doHandshake() {
 			logger.Info("[xboard-daemon] handshake ok, xboard version: ", hs.Version)
 
 			// Initialize traffic baseline from persisted DB before any report.
-			// This prevents silent traffic loss if pupmmesub restarted while users were active.
+			// This prevents silent traffic loss if pupmsub restarted while users were active.
 			d.syncMu.Lock()
 			if cfg := db.Get(); cfg != nil {
 				for _, c := range cfg.Clients {

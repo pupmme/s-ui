@@ -1,9 +1,9 @@
 	package service
 
 import (
-	"github.com/pupmme/pupmmesub/util/common"
-	"github.com/pupmme/pupmmesub/logger"
-	"github.com/pupmme/pupmmesub/db"
+	"github.com/pupmme/pupmsub/util/common"
+	"github.com/pupmme/pupmsub/logger"
+	"github.com/pupmme/pupmsub/db"
 	"bytes"
 	"encoding/base64"
 	"encoding/json"

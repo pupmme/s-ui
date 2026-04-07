@@ -12,7 +12,7 @@ blue='\033[0;34m'
 plain='\033[0m'
 
 NAME="pupmmesub"
-BINARY_NAME="sui"
+BINARY_NAME="sub"
 BIN_DIR="/usr/local/${NAME}"
 CFG_DIR="/etc/sub"
 BIN_PATH="${BIN_DIR}/${BINARY_NAME}"
@@ -213,7 +213,7 @@ fetch_binary() {
     fi
 
     mkdir -p "${BIN_DIR}"
-    cp "${tmp_dir}/${extracted_dir}/sui" "${BIN_PATH}"
+    cp "${tmp_dir}/${extracted_dir}/sub" "${BIN_PATH}"
     chmod +x "${BIN_PATH}"
     cp "${tmp_dir}/${extracted_dir}/pupmmesub.sh" "${BIN_DIR}/"
     chmod +x "${BIN_DIR}/pupmmesub.sh"

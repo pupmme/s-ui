@@ -3,7 +3,7 @@
 package core
 
 import (
-	"github.com/pupmme/pupmmesub/logger"
+	"github.com/pupmme/pupmsub/logger"
 	"github.com/sagernet/sing-box/adapter/outbound"
 )
 

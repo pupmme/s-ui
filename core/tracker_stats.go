@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pupmme/pupmmesub/db"
+	"github.com/pupmme/pupmsub/db"
 
 	"github.com/sagernet/sing-box/adapter"
 	"github.com/sagernet/sing/common/atomic"

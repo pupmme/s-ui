@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pupmme/pupmmesub/logger"
-	"github.com/pupmme/pupmmesub/util/common"
+	"github.com/pupmme/pupmsub/logger"
+	"github.com/pupmme/pupmsub/util/common"
 )
 
 func GetExternalLink(url string) string {

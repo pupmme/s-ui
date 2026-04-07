@@ -300,8 +300,8 @@ const subUpdates = computed({
 })
 
 const nodeMode = computed({
-  get: () => !!settings.value.nodeMode,
-  set: (v:boolean) => { settings.value.nodeMode = v }
+  get: () => settings.value.nodeMode === "true",
+  set: (v:boolean) => { settings.value.nodeMode = v.toString() }
 })
 
 const stateChange = computed(() => {

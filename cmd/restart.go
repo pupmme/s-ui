@@ -1,8 +1,8 @@
 package cmd
 
 import (
-	"github.com/pupmme/pupmmesub/logger"
-	"github.com/pupmme/pupmmesub/service"
+	"github.com/pupmme/pupmsub/logger"
+	"github.com/pupmme/pupmsub/service"
 	"github.com/spf13/cobra"
 )
 

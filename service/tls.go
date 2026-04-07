@@ -1,8 +1,8 @@
 	package service
 
 import (
-	"github.com/pupmme/pupmmesub/util/common"
-	"github.com/pupmme/pupmmesub/db"
+	"github.com/pupmme/pupmsub/util/common"
+	"github.com/pupmme/pupmsub/db"
 	"encoding/json"
 
 )
