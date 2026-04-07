@@ -162,8 +162,6 @@ fetch_binary() {
     local tmp_dir=$(mktemp -d)
     local tmp_tar="${tmp_dir}/pupmmesub.tar.gz"
 
-    info "下载 pupmmesub ${arch} ..."
-
     # 获取版本
     if [[ $# -eq 0 ]]; then
         local latest=$(curl -sL "${REPO_API}/latest" | grep -oP '"tag_name":\s*"\K[^"]+')
@@ -177,16 +175,47 @@ fetch_binary() {
     fi
     info "版本: ${latest}"
 
-    # 多镜像下载
+    mkdir -p "${BIN_DIR}"
+
+    # ---- 优先尝试单文件 ELF ----
+    info "下载 pupmmesub ${arch} (单文件模式) ..."
+    local single_url="${REPO_DOWNLOAD}/${latest}/pupmmesub-linux-${arch}"
+    local single_mirrors=(
+        "https://gh-proxy.com${single_url}"
+        "https://ghfast.top${single_url}"
+        "${single_url}"
+    )
+
+    local downloaded=false
+    for url in "${single_mirrors[@]}"; do
+        if wget -q -O "${BIN_PATH}" "${url}" --timeout=120 2>/dev/null || \
+           curl -sL --fail --max-time 120 "${url}" -o "${BIN_PATH}" 2>/dev/null; then
+            if [[ -s "${BIN_PATH}" ]]; then
+                downloaded=true
+                break
+            fi
+        fi
+    done
+
+    if $downloaded; then
+        chmod +x "${BIN_PATH}"
+        success "单文件 ELF 下载成功 (${BIN_PATH})"
+        rm -rf "${tmp_dir}"
+        return 0
+    fi
+
+    # ---- fallback: tar.gz ----
+    warn "单文件下载失败，尝试 tar.gz ..."
+    info "下载 pupmmesub ${arch} (tar.gz 模式) ..."
     local base_url="${REPO_DOWNLOAD}/${latest}/pupmmesub-linux-${arch}.tar.gz"
-    local mirrors=(
+    local tar_mirrors=(
         "https://gh-proxy.com${base_url}"
         "https://ghfast.top${base_url}"
         "${base_url}"
     )
 
-    local downloaded=false
-    for url in "${mirrors[@]}"; do
+    downloaded=false
+    for url in "${tar_mirrors[@]}"; do
         info "尝试下载: ${url}"
         if wget -q -O "${tmp_tar}" "${url}" --timeout=120; then
             downloaded=true
@@ -201,7 +230,7 @@ fetch_binary() {
         rm -rf "${tmp_dir}"
         exit 1
     fi
-    success "下载完成"
+    success "tar.gz 下载完成"
 
     # 解压
     tar -xzf "${tmp_tar}" -C "${tmp_dir}"
@@ -212,7 +241,6 @@ fetch_binary() {
         exit 1
     fi
 
-    mkdir -p "${BIN_DIR}"
     cp "${tmp_dir}/${extracted_dir}/sub" "${BIN_PATH}"
     chmod +x "${BIN_PATH}"
     cp "${tmp_dir}/${extracted_dir}/pupmmesub.sh" "${BIN_DIR}/"
@@ -220,7 +248,7 @@ fetch_binary() {
     ln -sf "${BIN_DIR}/pupmmesub.sh" "${CMD_PATH}"
 
     rm -rf "${tmp_dir}"
-    success "二进制安装完成 (${BIN_PATH})"
+    success "tar.gz 安装完成 (${BIN_PATH})"
 }
 
 enable_start() {
