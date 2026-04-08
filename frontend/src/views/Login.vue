@@ -85,7 +85,10 @@ const router = useRouter()
 const login = async () => {
   if (username.value == '' || password.value == '') return
   loading.value=true
-  const response = await HttpUtil.post('api/login',{user: username.value, pass: password.value})
+  const data = new URLSearchParams()
+  data.append('user', username.value)
+  data.append('pass', password.value)
+  const response = await HttpUtil.post('api/login', data, { maxRedirects: 0 })
   if(response.success){
     setTimeout(() => {
       loading.value=false

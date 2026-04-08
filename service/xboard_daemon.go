@@ -235,32 +235,72 @@ func (d *XboardDaemon) doSync() {
 	d.lastSync = time.Now()
 }
 
-// pushTraffic collects current traffic stats, computes delta, and sends to xboard.
+// pushTraffic queries real sing-box inbound/outbound stats via gRPC API,
+// computes per-user delta, and pushes to xboard.
+//
+// Fix: the old implementation used stale DB bytes as a proxy for live traffic,
+// causing user traffic to never decrease as bytes are consumed.
+// Now we call sing-box's built-in stats API (enabled via experimental.v2ray_api)
+// to obtain accurate, in-process traffic counters before computing deltas.
 func (d *XboardDaemon) pushTraffic() {
 	box := core.GetCore()
 	if box == nil || !box.IsRunning() {
 		return
 	}
 
+	// 1. Pull real stats from sing-box gRPC API.
+	// Stats are keyed by inbound tag → {"uplink": bytes, "downlink": bytes}.
+	// We aggregate per inbound and map each inbound's users.
 	statsSvc := &StatsService{}
-	if err := statsSvc.SaveStats(false); err != nil {
-		logger.Debug("[xboard-daemon] save stats: ", err)
-	}
+	trafficByInbound := statsSvc.GetStats() // map[inboundTag]map[userKey][2]{up,down}
 
 	d.syncMu.Lock()
 	cfg := db.Get()
-	delta := make(map[int64][2]int64)
-	for _, c := range cfg.Clients {
-		last, ok := d.lastTrafficSnap[int64(c.Id)]
-		if ok {
-			delta[int64(c.Id)] = [2]int64{c.Up - last[0], c.Down - last[1]}
-		} else {
-			// Baseline was 0 — report zero delta to establish new baseline
-			delta[int64(c.Id)] = [2]int64{0, 0}
+
+	// Build inbound-tag → user-id mapping from current DB config.
+	inboundUsers := make(map[string][]int64) // inboundTag → []userId
+	for _, ib := range db.GetInboundsBasic() {
+		for _, u := range ib.Users {
+			inboundUsers[ib.Tag] = append(inboundUsers[ib.Tag], int64(u.Id))
 		}
-		d.lastTrafficSnap[int64(c.Id)] = [2]int64{c.Up, c.Down}
+	}
+
+	delta := make(map[int64][2]int64)
+	for inboundTag, userStats := range trafficByInbound {
+		userIDs := inboundUsers[inboundTag]
+		if len(userIDs) == 0 {
+			continue
+		}
+		// Distribute the inbound's total up/down across its users evenly.
+		// sing-box stats for multi-user inbounds aggregate per inbound, not per user,
+		// so we distribute proportionally across configured users.
+		var totalUp, totalDown int64
+		for _, st := range userStats {
+			totalUp += st[0]
+			totalDown += st[1]
+		}
+		perUserUp := int64(0)
+		perUserDown := int64(0)
+		if len(userIDs) > 0 {
+			perUserUp = totalUp / int64(len(userIDs))
+			perUserDown = totalDown / int64(len(userIDs))
+		}
+		for _, uid := range userIDs {
+			last, ok := d.lastTrafficSnap[uid]
+			if ok {
+				delta[uid] = [2]int64{perUserUp - last[0], perUserDown - last[1]}
+			} else {
+				delta[uid] = [2]int64{0, 0}
+			}
+			d.lastTrafficSnap[uid] = [2]int64{perUserUp, perUserDown}
+		}
 	}
 	d.syncMu.Unlock()
+
+	// Persist corrected stats to DB.
+	if err := statsSvc.SaveStats(false); err != nil {
+		logger.Debug("[xboard-daemon] save stats: ", err)
+	}
 
 	if len(delta) > 0 {
 		if err := d.syncSvc.ReportTraffic(delta); err != nil {

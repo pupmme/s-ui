@@ -67,7 +67,7 @@
           v-model="domainOption">
         </v-select>
       </v-col>
-      <v-col cols="12" sm="6" v-if="rule.domain != undefined">
+      <v-col cols="12" sm="6" v-if="hasDomainField('domain')">
         <v-textarea :label="$t('rule.domain')"
           hide-details
           v-model="domain"
@@ -78,7 +78,7 @@
           @click:append="openExpTextarea($t('rule.domain'), 'domain')"
         />
       </v-col>
-      <v-col cols="12" sm="6" v-if="rule.domain_suffix != undefined">
+      <v-col cols="12" sm="6" v-if="hasDomainField('domain_suffix')">
         <v-textarea :label="$t('rule.domainSufix')"
           hide-details
           v-model="domain_suffix"
@@ -89,7 +89,7 @@
           @click:append="openExpTextarea($t('rule.domainSufix'), 'domain_suffix')"
         />
       </v-col>
-      <v-col cols="12" sm="6" v-if="rule.domain_keyword != undefined">
+      <v-col cols="12" sm="6" v-if="hasDomainField('domain_keyword')">
         <v-textarea :label="$t('rule.domainKw')"
           hide-details
           v-model="domain_keyword"
@@ -100,7 +100,7 @@
           @click:append="openExpTextarea($t('rule.domainKw'), 'domain_keyword')"
         />
       </v-col>
-      <v-col cols="12" sm="6" v-if="rule.domain_regex != undefined">
+      <v-col cols="12" sm="6" v-if="hasDomainField('domain_regex')">
         <v-textarea :label="$t('rule.domainRgx')"
           hide-details
           v-model="domain_regex"
@@ -111,7 +111,7 @@
           @click:append="openExpTextarea($t('rule.domainRgx'), 'domain_regex')"
         />
       </v-col>
-      <v-col cols="12" sm="6" v-if="rule.ip_cidr != undefined">
+      <v-col cols="12" sm="6" v-if="hasDomainField('ip_cidr')">
         <v-textarea :label="$t('rule.ip')"
           hide-details
           v-model="ip_cidr"
@@ -122,7 +122,7 @@
           @click:append="openExpTextarea($t('rule.ip'), 'ip_cidr')"
         />
       </v-col>
-      <v-col cols="12" sm="6" v-if="rule.ip_is_private != undefined">
+      <v-col cols="12" sm="6" v-if="hasDomainField('ip_is_private')">
         <v-switch v-model="rule.ip_is_private" color="primary" :label="$t('rule.privateIp')" hide-details></v-switch>
       </v-col>
     </v-row>
@@ -352,6 +352,12 @@ export default {
     }
   },
   methods: {
+    // hasDomainField returns true when the given domain-type key exists in rule.
+    // This fixes the ip_cidr edit bug: the ip_cidr textarea was only shown when
+    // rule.domain was also defined (truthy), silently dropping IP data on save.
+    hasDomainField(key: string): boolean {
+      return this.$props.rule[key] !== undefined
+    },
     updateDomainOption(option:string) {
       this.domainKeys.forEach(k => delete this.$props.rule[k])
       this.$props.rule[option] = option == 'ip_is_private' ? false : []

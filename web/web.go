@@ -86,6 +86,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	engine.Use(gzip.Gzip(gzip.DefaultCompression))
 
 	store := cookie.NewStore(secret)
+	store.Options(sessions.Options{Path: "/", MaxAge: 86400 * 7, HttpOnly: true, SameSite: 1});
 	engine.Use(sessions.Sessions("sub", store))
 
 	// Serve assets under base_url/assets/ so SPA can load them

@@ -89,7 +89,7 @@ let intervalId:any
 // Navigation guard to check authentication state
 router.beforeEach((to) => {
   // Check the session cookie
-  const sessionCookie = document.cookie.split(';').find(cookie => cookie.trim().startsWith('pupmsub='))
+  const sessionCookie = document.cookie.split(';').find(cookie => cookie.trim().startsWith('sub='))
   const isAuthenticated = !!sessionCookie
 
   // If the route requires authentication and the user is not authenticated, redirect to /login

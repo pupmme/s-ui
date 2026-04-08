@@ -141,7 +141,7 @@ func (a *ApiService) Login(c *gin.Context) {
 	}
 
 	SetLoginUser(c, username, 0)
-	c.JSON(200, gin.H{"status": "success"})
+	c.JSON(200, gin.H{"success": true, "msg": "login", "obj": nil})
 }
 
 func (a *ApiService) Save(c *gin.Context) {
